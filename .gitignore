@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-electron/
+.dev-sessions/
+temp/
+*.log
+.DS_Store

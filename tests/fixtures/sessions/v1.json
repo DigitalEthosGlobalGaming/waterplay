@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "buildId": "muq3fht3",
+  "instance": "A",
+  "savedAt": 1790893006157,
+  "net": { "role": "offline", "sessionCode": "", "localPeerId": "local" },
+  "local": {
+    "camera": { "yaw": 2.356194490192345, "pitch": 0.35 },
+    "input": { "activeDevice": "kbm" },
+    "devFlags": {}
+  },
+  "world": { "seed": 1, "tick": 0, "worldClock": 0, "rngState": 1 }
+}

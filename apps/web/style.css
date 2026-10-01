@@ -1,0 +1,114 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #9fd8f0;
+  font-family: system-ui, sans-serif;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+}
+
+/* DOM UI layer over the canvas (§12.3). */
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dev-indicator {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.55);
+  color: #e8f6ff;
+  font:
+    11px / 1.4 ui-monospace,
+    monospace;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dev-indicator[data-partial="true"] {
+  background: rgb(150 90 0 / 0.75);
+}
+
+.dev-indicator pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+/* Driving HUD */
+.hud {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgb(0 40 70 / 0.6);
+}
+
+.hud-speed {
+  font:
+    700 40px / 1 system-ui,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-speed small {
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.hud-throttle {
+  width: 140px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.3);
+  overflow: hidden;
+}
+
+.hud-throttle-fill {
+  height: 100%;
+  background: #fff;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.hud-throttle-fill[data-reverse="true"] {
+  background: #ffb36b;
+}
+
+.hud-throttle-fill[data-boost="true"] {
+  background: #7ff0ff;
+}
+
+.hud-prompts {
+  margin-top: 4px;
+  font-size: 12px;
+  text-align: right;
+  opacity: 0.9;
+}
+
+.hud-prompts kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgb(0 30 50 / 0.45);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+}

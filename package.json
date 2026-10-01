@@ -1,0 +1,41 @@
+{
+  "name": "waterplay",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "dev:desktop": "tsx tools/dev-electron.ts --instances=1",
+    "dev:duo": "tsx tools/dev-electron.ts --instances=2",
+    "dev:trio": "tsx tools/dev-electron.ts --instances=3",
+    "dev:reset": "rimraf .dev-sessions",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check . && tsx tools/check-core-purity.ts",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "concurrently --group \"npm:typecheck\" \"npm:lint\" \"npm:test\"",
+    "build:web": "vite build",
+    "build:desktop": "vite build && tsx tools/build-electron.ts",
+    "check:bundle": "tsx tools/check-prod-bundle.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.21.0",
+    "lil-gui": "0.21.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "26.6.3",
+    "@types/three": "0.186.0",
+    "concurrently": "10.0.5",
+    "electron": "44.5.1",
+    "esbuild": "0.28.2",
+    "rimraf": "6.1.3",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  }
+}
