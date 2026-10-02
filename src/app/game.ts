@@ -7,6 +7,7 @@ import type { EntityId } from '../core/interfaces/common.ts';
 import type { Platform } from '../core/interfaces/platform.ts';
 import type { PeerId, Transport } from '../core/interfaces/transport.ts';
 import { headingOf, quatFromYaw } from '../core/math/vec.ts';
+import { wrapDelta } from '../core/net/interpolation.ts';
 import { FixedStepAccumulator } from '../core/sim/fixed-step.ts';
 import { EntityIdAllocator } from '../core/sim/ids.ts';
 import { Sim, type SimOptions } from '../core/sim/sim.ts';
@@ -60,6 +61,8 @@ export class Game {
   devFlags: Record<string, unknown> = {};
   /** While true the sim doesn't advance (used during restore/resync, §13.4.4). */
   paused = false;
+  /** Boats left out of the session snapshot (dev dummies). */
+  readonly transientBoats = new Set<EntityId>();
   /** Hooks for dev tools; called once per rendered frame. */
   readonly frameHooks = new Set<(frameSeconds: number) => void>();
 
@@ -152,7 +155,9 @@ export class Game {
     return {
       net: this.multiplayer.snapshot(),
       local: {
-        boats: [...this.sim.allBoats()].map((b) => b.state()),
+        boats: [...this.sim.allBoats()]
+          .filter((b) => !this.transientBoats.has(b.id))
+          .map((b) => b.state()),
         camera: { ...this.renderer.chase.state },
         input: { activeDevice: this.input.activeDevice },
         devFlags: { ...this.devFlags },
@@ -187,6 +192,11 @@ export class Game {
     // (Optional chaining: the first Sim exists before multiplayer is set up.)
     sim.remoteHulls = (t) => this.multiplayer?.session.remoteBoats(t) ?? [];
     return sim;
+  }
+
+  /** A new id for a boat this instance owns. */
+  nextEntityId(): EntityId {
+    return this.ids.next();
   }
 
   private spawnLocalBoat(): EntityId {
@@ -233,6 +243,12 @@ export class Game {
       {
         time,
         boats,
+        wakes: this.sim.wakes.emitters.map((w) => ({
+          x: w.x,
+          z: w.z,
+          age: wrapDelta(w.t0, time, simTunables.worldClockLoopPeriod),
+          amplitude: w.amplitude,
+        })),
         focus:
           local && localPose
             ? {

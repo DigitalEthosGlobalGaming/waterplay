@@ -1,12 +1,13 @@
 import { platforms } from '../../data/platforms.ts';
 import { simTunables } from '../../data/sim.ts';
-import { waterParams } from '../../data/water.ts';
+import { wakeParams, waterParams } from '../../data/water.ts';
 import { Boat, type BoatState } from '../boats/boat.ts';
 import { applyRemoteContacts, type RemoteHull } from '../boats/contacts.ts';
 import type { EntityId, Quat, Vec3 } from '../interfaces/common.ts';
 import type { BodyHandle, PhysicsWorld } from '../interfaces/physics.ts';
 import { lerp3, slerp } from '../math/vec.ts';
 import { createWaterSampler, type WaterSampler, waveConstants } from '../water/gerstner.ts';
+import { WakeField, type WakeSource } from '../water/wakes.ts';
 import { Rng, type RngState } from './rng.ts';
 
 /** Host-authoritative shared world state. Everything here is in the session snapshot. */
@@ -50,6 +51,8 @@ export class Sim {
   private readonly statics: BodyHandle[] = [];
   /** Other players' boats at a given world time, for bumping (§8). Transient; set by the net layer. */
   remoteHulls: (worldClock: number) => readonly RemoteHull[] = () => [];
+  /** Every boat's wake (§6.2). Transient: rebuilt from boat motion within a few seconds. */
+  readonly wakes = new WakeField(() => wakeParams);
 
   constructor(opts: SimOptions) {
     const init = opts.world;
@@ -117,14 +120,31 @@ export class Sim {
     const { dt, worldClockLoopPeriod, gravity } = simTunables;
     const water = this.water();
     const remotes = this.remoteHulls(this.clock);
+    this.wakes.update(this.clock, worldClockLoopPeriod, this.wakeSources(remotes));
     for (const boat of this.boats.values()) {
       this.previousPoses.set(boat.id, this.physics.getTransform(boat.body));
-      boat.applyForces(water, dt, gravity);
+      // Each boat rides the waves plus everyone else's wakes, never its own.
+      const sea = this.wakes.sampler(water, this.clock, worldClockLoopPeriod, boat.id);
+      boat.applyForces(sea, dt, gravity);
       applyRemoteContacts(boat, remotes);
     }
     this.physics.step(dt);
     this.tickCount += 1;
     this.clock = (this.clock + dt) % worldClockLoopPeriod;
+  }
+
+  private wakeSources(remotes: readonly RemoteHull[]): WakeSource[] {
+    const sources: WakeSource[] = [];
+    for (const boat of this.boats.values()) {
+      const { position } = this.physics.getTransform(boat.body);
+      const v = this.physics.getLinearVelocity(boat.body);
+      sources.push({ id: boat.id, x: position.x, z: position.z, vx: v.x, vz: v.z });
+    }
+    // Other players' boats make waves here too, from their replicated motion.
+    for (const r of remotes) {
+      sources.push({ id: r.key, x: r.position.x, z: r.position.z, vx: r.linVel.x, vz: r.linVel.z });
+    }
+    return sources;
   }
 
   /** Pose blended between the previous and current step (alpha 0..1). */

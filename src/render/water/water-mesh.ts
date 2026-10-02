@@ -2,7 +2,11 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DataTexture,
+  FloatType,
   Mesh,
+  NearestFilter,
+  RGBAFormat,
   ShaderMaterial,
   UniformsLib,
   UniformsUtils,
@@ -11,8 +15,9 @@ import {
   Vector4,
 } from 'three';
 import { MAX_WAVES, waveConstants, wavePhases } from '../../core/water/gerstner.ts';
+import { MAX_WAKE_EMITTERS } from '../../core/water/wakes.ts';
 import { simTunables } from '../../data/sim.ts';
-import { waterLook, waterParams } from '../../data/water.ts';
+import { wakeParams, waterLook, waterParams } from '../../data/water.ts';
 import { SKY_COMMON_GLSL, type SkyLighting, type SkyUniforms } from '../sky/sky.ts';
 import fragmentShader from './water.frag.glsl?raw';
 import vertexShader from './water.vert.glsl?raw';
@@ -39,6 +44,16 @@ export interface WaterFrame {
   centreX: number;
   centreZ: number;
   lighting: SkyLighting;
+  /** Live wake emitters, aged to `time`. */
+  wakes: readonly WakeView[];
+}
+
+export interface WakeView {
+  x: number;
+  z: number;
+  /** Seconds since dropped, at the frame's time. */
+  age: number;
+  amplitude: number;
 }
 
 /**
@@ -77,7 +92,23 @@ export class WaterMesh extends Mesh<BufferGeometry, ShaderMaterial> {
       amplitude += w.amplitude;
     });
 
+    // Wakes: one texel per emitter.
+    const data = u.uWakeTex.value.image.data as Float32Array;
+    const count = Math.min(MAX_WAKE_EMITTERS, f.wakes.length);
+    for (let i = 0; i < count; i++) {
+      const w = f.wakes[i] as WakeView;
+      data.set([w.x, w.z, w.age, w.amplitude], i * 4);
+    }
+    u.uWakeTex.value.needsUpdate = true;
+    u.uWakeCount.value = count;
+    const wp = wakeParams;
+    u.uWakeParams.value.set(wp.ringSpeed, Math.max(0.01, wp.width), wp.lifetime, wp.fadeIn);
+    u.uWakeSpread.value = Math.max(0.01, wp.spreadRadius);
+
     const look = waterLook;
+    u.uWakeFoamStart.value = look.wakeFoamStart;
+    u.uWakeFoamEnd.value = Math.max(look.wakeFoamStart + 0.001, look.wakeFoamEnd);
+    u.uWakeFoamOpacity.value = look.wakeFoamOpacity;
     u.uWaveCount.value = waves.length;
     u.uCentre.value.set(this.position.x, this.position.z);
     u.uFadeStart.value = look.waveFadeStart;
@@ -107,6 +138,7 @@ export class WaterMesh extends Mesh<BufferGeometry, ShaderMaterial> {
 
   override dispose(): void {
     materials.delete(this.material);
+    this.u.uWakeTex.value.dispose();
     this.geometry.dispose();
     this.material.dispose();
   }
@@ -141,7 +173,28 @@ function waterUniforms() {
     uScatter: { value: 0.5 },
     uNormalFadeStart: { value: 150 },
     uNormalFadeEnd: { value: 700 },
+    uWakeTex: { value: wakeTexture() },
+    uWakeCount: { value: 0 },
+    uWakeParams: { value: new Vector4(4, 2, 7, 0.4) },
+    uWakeSpread: { value: 6 },
+    uWakeFoamStart: { value: 0.06 },
+    uWakeFoamEnd: { value: 0.3 },
+    uWakeFoamOpacity: { value: 0.6 },
   };
+}
+
+function wakeTexture(): DataTexture {
+  const t = new DataTexture(
+    new Float32Array(MAX_WAKE_EMITTERS * 4),
+    MAX_WAKE_EMITTERS,
+    1,
+    RGBAFormat,
+    FloatType,
+  );
+  t.minFilter = NearestFilter;
+  t.magFilter = NearestFilter;
+  t.needsUpdate = true;
+  return t;
 }
 
 /** Grid coordinates along one axis: uniform near the centre, then growing outward. */

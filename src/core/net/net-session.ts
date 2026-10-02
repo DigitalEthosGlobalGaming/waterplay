@@ -42,8 +42,6 @@ export interface NetPlayer {
 }
 
 export interface RemoteBoat extends RemoteHull {
-  /** `${peerId}/${entityId}`; entity ids are only unique per owner. */
-  key: string;
   peerId: PeerId;
   name: string;
   throttle: number;

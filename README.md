@@ -19,7 +19,8 @@ Open the menu (**Esc** / **Start**) and choose **Host a game**. You get a code l
 - **M0 — Scaffold:** done
 - **M1 — Boat in water:** Gerstner waves shared by physics and shader, a buoyant speedboat with weighted handling, a chase camera, a day/night cycle and live tuning
 - **M3 — Multiplayer (part 1):** host/join with share codes and invite links, smooth remote boats, bumping, shared world clock, controller-friendly menu
-- **Next:** M3 part 2 (dev relay, multi-instance dev tooling), then M2 — wakes
+- **M2 — Wakes:** every boat leaves a V-shaped wake with foam, and other boats' wakes (including friends') rock you
+- **Next:** M3 part 2 (dev relay, multi-instance dev tooling), then M4 — large world
 
 The design and roadmap are in [docs/architecture.md](docs/architecture.md).
 

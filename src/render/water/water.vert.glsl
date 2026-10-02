@@ -7,6 +7,8 @@
 // lies exactly on the shared surface.
 
 #define MAX_WAVES 6
+// Same cap as MAX_WAKE_EMITTERS in src/core/water/wakes.ts.
+#define MAX_WAKES 256
 
 uniform vec4 uWaveA[MAX_WAVES]; // dirX, dirZ, k, phase
 uniform vec2 uWaveB[MAX_WAVES]; // amplitude, horiz
@@ -18,10 +20,18 @@ uniform float uCell;
 uniform float uJitter;
 uniform float uJitterRadius;
 
+// Boat wakes (§6.2). One texel per emitter: x, z, age (s), amplitude.
+uniform sampler2D uWakeTex;
+uniform int uWakeCount;
+uniform vec4 uWakeParams; // ringSpeed, width, lifetime, fadeIn
+uniform float uWakeSpread;
+
 varying vec3 vWorldPos;
 varying float vHeight;
 /** Jacobian of the horizontal displacement: < 1 where crests pinch together (foam). */
 varying float vFold;
+/** Wake height here, for wake foam. */
+varying float vWake;
 
 #include <common>
 #include <fog_pars_vertex>
@@ -30,6 +40,29 @@ float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
+}
+
+// One wake ring. MUST match wakeRingHeight() in src/core/water/wakes.ts.
+float wakeHeight(float d, float age, float amplitude) {
+  float lifetime = uWakeParams.z;
+  if (age <= 0.0 || age >= lifetime) return 0.0;
+  float r = uWakeParams.x * age;
+  float s = (d - r) / uWakeParams.y;
+  if (abs(s) > 4.0) return 0.0;
+  float life = 1.0 - age / lifetime;
+  float env = life * life * smoothstep(0.0, uWakeParams.w, age) / sqrt(1.0 + r / uWakeSpread);
+  float s2 = s * s;
+  return amplitude * env * (1.0 - s2) * exp(-0.5 * s2);
+}
+
+float wakeSum(vec2 p) {
+  float h = 0.0;
+  for (int i = 0; i < MAX_WAKES; i++) {
+    if (i >= uWakeCount) break;
+    vec4 w = texelFetch(uWakeTex, ivec2(i, 0), 0);
+    h += wakeHeight(length(p - w.xy), w.z, w.w);
+  }
+  return h;
 }
 
 void main() {
@@ -67,10 +100,13 @@ void main() {
   offset *= fade;
 
   world.x = p0.x + offset.x;
-  world.y = offset.y;
   world.z = p0.y + offset.z;
+  // Wakes are purely vertical, evaluated where the vertex ends up (as buoyancy samples them).
+  float wake = wakeSum(world.xz);
+  world.y = offset.y + wake;
   vWorldPos = world.xyz;
   vHeight = offset.y;
+  vWake = wake;
   vFold = mix(1.0, jxx * jzz - jxz * jxz, fade);
 
   vec4 mvPosition = viewMatrix * world;

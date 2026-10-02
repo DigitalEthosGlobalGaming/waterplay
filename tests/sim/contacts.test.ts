@@ -21,7 +21,13 @@ function pair(gap: number, closing: number) {
     if (!boat) return [];
     const { position, rotation } = sim.physics.getTransform(boat.body);
     return [
-      { boatType: boat.type, position, rotation, linVel: sim.physics.getLinearVelocity(boat.body) },
+      {
+        key: `remote/${id}`,
+        boatType: boat.type,
+        position,
+        rotation,
+        linVel: sim.physics.getLinearVelocity(boat.body),
+      },
     ];
   };
   a.remoteHulls = () => hull(b, 'b:1');

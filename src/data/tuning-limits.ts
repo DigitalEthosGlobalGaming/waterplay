@@ -24,6 +24,13 @@ const LOWER_BOUNDS: Record<string, { min: number; inclusive: boolean }> = {
   dragForwardLinear: { min: 0, inclusive: true },
   dragSideways: { min: 0, inclusive: true },
   dragVertical: { min: 0, inclusive: true },
+  // Wakes: a zero interval would drop an emitter every step and starve the shader's 256.
+  dropInterval: { min: 0.02, inclusive: true },
+  lifetime: { min: 0, inclusive: false },
+  ringSpeed: { min: 0, inclusive: true },
+  width: { min: 0, inclusive: false },
+  spreadRadius: { min: 0, inclusive: false },
+  fadeIn: { min: 0, inclusive: true },
 };
 
 /** Returns why `value` is not allowed for `prop`, or null if it's fine. */

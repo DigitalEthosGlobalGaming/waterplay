@@ -264,7 +264,8 @@ waterHeight(x, z, t) = gerstnerSum(x, z, t) + wakeSum(x, z, t)
 - Each emitter contributes a decaying, expanding ring (or Kelvin-style V when we get fancy) to `wakeSum`.
 - Emitters expire after ~6–8s. Cap the global count (e.g. 256) and pass them to the shader as a uniform array or data texture.
 - **Emitters are derived from replicated boat positions**, so every client generates the same wakes locally. Wakes are never sent over the network.
-- CPU optimisation: spatial hash of emitters so buoyancy sampling only checks nearby ones.
+- CPU optimisation: spatial hash of emitters so buoyancy sampling only checks nearby ones (not needed yet at 256 emitters).
+- *As built (M2):* rings use a Ricker profile (crest with a trough either side) that spreads at `ringSpeed`. Because rings spread slower than the boat, the trail adds up to a V. Each ring's height scales with boat speed and with emitter spacing, so wakes don't pile up when boats are slow. **A boat never feels its own wake**, only other boats'. Emitters reach the shader as a 256×1 float texture (x, z, age, amplitude). Wake crests get their own foam (`wakeFoam*` in `data/water.ts`). Tunables are in `wakeParams`; the AI dummy boat is in the dev tuning panel under "Wakes". Drafting (riding behind is faster) is not in yet.
 
 ### 6.3 Look
 

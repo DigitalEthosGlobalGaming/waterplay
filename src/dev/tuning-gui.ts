@@ -5,9 +5,10 @@ import { cameraTunables } from '../data/camera.ts';
 import { onTunablesChanged, resetTunableOverrides, setTunableOverride } from '../data/registry.ts';
 import { cloudTunables, skyTunables } from '../data/sky.ts';
 import { checkTunable } from '../data/tuning-limits.ts';
-import { waterLook, waterParams } from '../data/water.ts';
+import { wakeParams, waterLook, waterParams } from '../data/water.ts';
 import { type Debounced, debounce } from './debounce.ts';
 import type { DevSessionControls } from './dev-session.ts';
+import { installDummyBoats } from './dummy-boats.ts';
 
 /** Edits apply once the value has settled, so typing "1200" never applies 1, 12, 120 on the way. */
 const EDIT_DEBOUNCE_MS = 250;
@@ -83,6 +84,10 @@ export function installTuningGui(game: Game, session: DevSessionControls): GUI {
   section(gui, fields, 'Boat: speedboat', 'boats', handling, ['speedboat', 'handling']);
   section(gui, fields, 'Waves', 'water', waterParams, []);
   section(gui, fields, 'Water look', 'waterLook', waterLook, []);
+  const wakes = section(gui, fields, 'Wakes', 'wakes', wakeParams, []);
+  const dummies = installDummyBoats(game);
+  wakes.add({ spawn: () => dummies.spawn() }, 'spawn').name('Spawn AI dummy boat');
+  wakes.add({ clear: () => dummies.clear() }, 'clear').name('Remove dummy boats');
   section(gui, fields, 'Camera', 'camera', cameraTunables, []);
   section(gui, fields, 'Sky & day cycle', 'sky', skyTunables, []);
   section(gui, fields, 'Clouds', 'clouds', cloudTunables, []);
@@ -124,7 +129,7 @@ function section(
   key: string,
   obj: object,
   basePath: string[],
-): void {
+): GUI {
   const folder = gui.addFolder(title).close();
   addFields(folder, fields, key, obj, basePath);
   folder
@@ -139,6 +144,7 @@ function section(
       'copy',
     )
     .name('Copy as TS');
+  return folder;
 }
 
 function addFields(folder: GUI, fields: Field[], key: string, obj: object, path: string[]): void {

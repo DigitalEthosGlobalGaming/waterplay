@@ -7,6 +7,8 @@ import type { Boat } from './boat.ts';
 
 /** Another player's boat as this peer sees it: drawn from replicated state, no physics body. */
 export interface RemoteHull {
+  /** Unique per remote boat (`${peerId}/${entityId}`). */
+  key: string;
   boatType: BoatTypeId;
   position: Vec3;
   rotation: Quat;

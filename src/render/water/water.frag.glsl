@@ -19,10 +19,14 @@ uniform float uShininess;
 uniform float uScatter;
 uniform float uNormalFadeStart;
 uniform float uNormalFadeEnd;
+uniform float uWakeFoamStart;
+uniform float uWakeFoamEnd;
+uniform float uWakeFoamOpacity;
 
 varying vec3 vWorldPos;
 varying float vHeight;
 varying float vFold;
+varying float vWake;
 
 #include <common>
 #include <fog_pars_fragment>
@@ -61,6 +65,8 @@ void main() {
 
   // Foam where crests pinch together. Lit, so it dims at night.
   float foam = 1.0 - smoothstep(uFoamStart, uFoamEnd, vFold);
+  // Churned white water on wake crests.
+  foam = max(foam, smoothstep(uWakeFoamStart, uWakeFoamEnd, vWake) * uWakeFoamOpacity);
   col = mix(col, uFoam * lit, foam);
 
   gl_FragColor = vec4(col, 1.0);

@@ -19,7 +19,7 @@ import { ChaseCamera } from './camera.ts';
 import { loadModel } from './models.ts';
 import { Clouds } from './sky/clouds.ts';
 import { Sky } from './sky/sky.ts';
-import { WaterMesh } from './water/water-mesh.ts';
+import { type WakeView, WaterMesh } from './water/water-mesh.ts';
 
 export interface RenderBoat {
   id: EntityId;
@@ -33,6 +33,7 @@ export interface RenderView {
   /** World clock (s) for the water surface. */
   time: number;
   boats: RenderBoat[];
+  wakes: readonly WakeView[];
   /** The boat the camera chases. */
   focus: { id: EntityId; heading: number; speed: number } | null;
 }
@@ -112,7 +113,13 @@ export class GameRenderer {
     this.sun.position.copy(this.focusPosition).addScaledVector(light.lightDir, LIGHT_DISTANCE);
     this.sun.target.position.copy(this.focusPosition);
     this.clouds.update(view.time, cam);
-    this.water.update({ time: view.time, centreX: cam.x, centreZ: cam.z, lighting: light });
+    this.water.update({
+      time: view.time,
+      centreX: cam.x,
+      centreZ: cam.z,
+      lighting: light,
+      wakes: view.wakes,
+    });
 
     this.renderer.render(this.scene, this.chase.camera);
   }
