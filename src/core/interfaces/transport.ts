@@ -15,8 +15,11 @@ export interface Transport {
   readonly localId: PeerId;
   readonly isHost: boolean;
 
-  /** Host: create a session and return a short share code. */
-  host(): Promise<{ shareCode: string }>;
+  /**
+   * Host: create a session and return a short share code. `preferredCode` asks
+   * for a specific code (re-hosting after a refresh); a fresh one is used if it's taken.
+   */
+  host(preferredCode?: string): Promise<{ shareCode: string }>;
   /** Client: join using a share code. */
   join(shareCode: string): Promise<void>;
   leave(): Promise<void>;

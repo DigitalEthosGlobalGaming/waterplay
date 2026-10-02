@@ -27,8 +27,11 @@ export class InputSystem {
 
   constructor(private readonly surface: HTMLElement) {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Keep the browser from tabbing focus away or scrolling while playing.
-      if (e.code === 'Tab' || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+      // Keep the browser from tabbing focus away or scrolling while playing,
+      // but leave text fields (menu name and code entry) alone.
+      const typing = e.target instanceof HTMLInputElement;
+      if (!typing && (e.code === 'Tab' || e.code.startsWith('Arrow') || e.code === 'Space'))
+        e.preventDefault();
       this.keys.add(e.code);
     };
     const onKeyUp = (e: KeyboardEvent) => this.keys.delete(e.code);

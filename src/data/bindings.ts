@@ -19,6 +19,8 @@ export type Binding =
   /** Axis from two analogue buttons (e.g. RT / LT): positive - negative. */
   | { kind: 'padButtonAxis'; negative: number; positive: number }
   | { kind: 'padAxis'; index: number; invert?: boolean }
+  /** 2D axis from the D-pad (standard mapping buttons 12–15). +y is down. */
+  | { kind: 'padDpad' }
   /** 2D axis from a stick. */
   | { kind: 'padStick'; x: number; y: number; invertY?: boolean };
 
@@ -80,7 +82,7 @@ export const defaultBindings = liveTunable<BindingSet>('bindings', {
     uiSplitStack: [{ kind: 'padButton', index: 2 }],
     uiTabLeft: [{ kind: 'padButton', index: 4 }],
     uiTabRight: [{ kind: 'padButton', index: 5 }],
-    uiNavigate: [{ kind: 'padStick', x: 0, y: 1 }],
+    uiNavigate: [{ kind: 'padDpad' }, { kind: 'padStick', x: 0, y: 1 }],
   },
 });
 

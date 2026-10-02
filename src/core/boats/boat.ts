@@ -64,7 +64,7 @@ export class Boat {
   private appliedMass = { mass: Number.NaN, x: 0, y: 0, z: 0 };
 
   constructor(
-    private readonly physics: PhysicsWorld,
+    readonly physics: PhysicsWorld,
     state: BoatState,
   ) {
     this.id = state.id;

@@ -18,12 +18,14 @@ const PROMPTS: Record<ActiveDevice, [keys: string, label: string][]> = {
     ['A / D', 'Steer'],
     ['Shift', 'Boost'],
     ['Drag mouse', 'Look'],
+    ['Esc', 'Menu · Multiplayer'],
   ],
   gamepad: [
     ['RT / LT', 'Throttle'],
     ['LS', 'Steer'],
     ['A', 'Boost'],
     ['RS', 'Look'],
+    ['Start', 'Menu · Multiplayer'],
   ],
 };
 

@@ -35,6 +35,9 @@ export function installDevSession(game: Game): DevSessionControls {
       // restoreSession never throws; applySession only applies what parsed.
       const restored = restoreSession(json);
       game.applySession(restored);
+      // Electron dev instances pick their session back up after a restart. Browser tabs
+      // share localStorage, so they rely on the per-tab page state instead.
+      if (bridge && restored.net) game.multiplayer.resumeFromSnapshot(restored.net);
       indicator.setRestore({ warnings: restored.warnings, storeKind: store.kind });
       if (restored.warnings.length)
         console.warn('[dev] partial session restore:', restored.warnings);

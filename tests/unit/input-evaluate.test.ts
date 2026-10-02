@@ -62,6 +62,14 @@ describe('input evaluation', () => {
     expect(Math.hypot(nav.x, nav.y)).toBeCloseTo(1);
   });
 
+  it('D-pad navigates menus', () => {
+    const buttons = Array.from({ length: 17 }, () => 0);
+    buttons[12] = 1; // up
+    buttons[15] = 1; // right
+    const v = evaluateActions(raw({ gamepad: { buttons, axes: [0, 0, 0, 0] } }), defaultBindings);
+    expect(actionValue(v, 'uiNavigate')).toMatchObject({ x: 1, y: -1 });
+  });
+
   it('radial deadzone rescales to reach full deflection', () => {
     expect(applyRadialDeadzone(1, 0, 0.15).x).toBeCloseTo(1);
     expect(applyRadialDeadzone(0.1, 0.1, 0.15)).toEqual({ x: 0, y: 0 });

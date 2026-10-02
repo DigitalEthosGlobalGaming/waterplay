@@ -54,6 +54,7 @@ export class GameRenderer {
   private readonly fog = new Fog(0xffffff);
   private readonly boats = new Map<EntityId, Group>();
   private readonly focusPosition = new Vector3();
+  private readonly projected = new Vector3();
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -114,6 +115,20 @@ export class GameRenderer {
     this.water.update({ time: view.time, centreX: cam.x, centreZ: cam.z, lighting: light });
 
     this.renderer.render(this.scene, this.chase.camera);
+  }
+
+  /** Where a world point lands on screen (CSS pixels), or null if behind the camera. */
+  screenPoint(p: Vec3): { x: number; y: number; distance: number } | null {
+    const camera = this.chase.camera;
+    const v = this.projected.set(p.x, p.y, p.z);
+    const distance = v.distanceTo(camera.position);
+    v.project(camera);
+    if (v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) return null;
+    return {
+      x: ((v.x + 1) / 2) * this.canvas.clientWidth,
+      y: ((1 - v.y) / 2) * this.canvas.clientHeight,
+      distance,
+    };
   }
 
   dispose(): void {

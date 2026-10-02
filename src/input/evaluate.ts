@@ -113,6 +113,10 @@ function evalBinding(b: Binding, raw: RawInput, deadzone: number): ActionValue {
       const v = applyDeadzone1(pad?.axes[b.index] ?? 0, deadzone);
       return { ...ZERO, value: b.invert ? -v : v };
     }
+    case 'padDpad': {
+      const button = (i: number) => ((pad?.buttons[i] ?? 0) > HELD_THRESHOLD ? 1 : 0);
+      return { ...ZERO, x: button(15) - button(14), y: button(13) - button(12) };
+    }
     case 'padStick': {
       const { x, y } = applyRadialDeadzone(pad?.axes[b.x] ?? 0, pad?.axes[b.y] ?? 0, deadzone);
       return { ...ZERO, x, y: b.invertY ? -y : y };

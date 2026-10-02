@@ -112,3 +112,227 @@ body {
   font-weight: 600;
   text-align: center;
 }
+
+/* Connection pill and notices (multiplayer) */
+.net-pill {
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgb(0 30 50 / 0.5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.net-pill::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #7dffa8;
+  vertical-align: 1px;
+}
+
+.net-pill[data-kind="starting"]::before,
+.net-pill[data-kind="joining"]::before,
+.net-pill[data-kind="reconnecting"]::before {
+  background: #ffd36b;
+}
+
+.net-pill[data-kind="offline"]::before {
+  background: #ff8a7a;
+}
+
+.net-notices {
+  position: fixed;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.net-notice {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgb(0 30 50 / 0.6);
+  color: #fff;
+  font-size: 14px;
+  animation: notice 4s ease forwards;
+}
+
+@keyframes notice {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  8%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Names over other players' boats */
+.name-tag {
+  position: fixed;
+  left: 0;
+  top: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(0 30 50 / 0.45);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+/* Pause menu */
+.menu {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 25 45 / 0.35);
+  pointer-events: auto;
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 20px;
+  border-radius: 16px;
+  background: rgb(250 253 255 / 0.95);
+  color: #12324a;
+  box-shadow: 0 12px 40px rgb(0 30 60 / 0.35);
+}
+
+.menu-panel h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  text-align: center;
+}
+
+.menu-status {
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.menu-error,
+.menu-flash {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.menu-error {
+  background: #ffe3de;
+  color: #8a2312;
+}
+
+.menu-flash {
+  background: #dff7e8;
+  color: #155a32;
+}
+
+.menu-panel button,
+.menu-panel input {
+  padding: 10px 14px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #e3f1fa;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+}
+
+.menu-panel button {
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu-panel input {
+  background: #fff;
+  border-color: #b9d8ea;
+}
+
+.menu-panel button:focus,
+.menu-panel input:focus {
+  border-color: #1f8fd0;
+  background: #cfe9f8;
+}
+
+.menu-panel input:focus {
+  background: #fff;
+}
+
+.menu-panel .menu-code {
+  font-family: ui-monospace, monospace;
+  font-size: 26px;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.menu-code::selection {
+  background: #1f8fd0;
+  color: #fff;
+}
+
+.menu-players {
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  border-radius: 10px;
+  background: #f0f7fb;
+  font-size: 14px;
+}
+
+.menu-players li {
+  padding: 2px 0;
+}
+
+.menu-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #cfe9f8;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.menu-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.menu-hint kbd {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #e3f1fa;
+  font: inherit;
+  font-weight: 600;
+}

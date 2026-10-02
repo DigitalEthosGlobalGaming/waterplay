@@ -341,8 +341,10 @@ Star topology through the host. This is a cosy co-op game, so authority favours 
 ### 8.2 Replication
 
 - **Boat snapshots** at 20 Hz on the unreliable channel: `{ entityId, seq, t, pos, rot, linVel, angVel, throttle, steer }`.
-- Remote boats are rendered with **snapshot interpolation** (~100ms buffer). Remote boat bodies are **kinematic** in the local physics world so local boats can bump into them.
-- **Bumps:** when your boat collides with a remote boat, apply the impulse locally to yourself and send a `BumpEvent` to the other owner, who applies the matching impulse. Good enough for a cosy game.
+- Remote boats are rendered with **snapshot interpolation** (~120ms buffer, on the shared world clock). They have no physics body; each peer sees them as hulls (`RemoteHull`).
+- **Bumps:** each peer pushes only the boats it owns away from remote hulls, using a spring-damper on the pair's reduced mass (`core/boats/contacts.ts`). Both sides compute equal and opposite pushes from the same states, so no bump messages are needed. Good enough for a cosy game.
+- **Clock:** clients ease their world clock toward the host's using ping/pong round trips (snap if more than 1 s off).
+- **Protocol version:** every message starts with `[protocolVersion u8][type u8]`. Peers on different versions are refused with a clear "refresh to update" message rather than misreading each other.
 - **Events** (reliable channel): join/leave, activity/job changes, inventory transactions, chat/emotes.
 
 ### 8.3 Inventory transactions
@@ -911,7 +913,7 @@ Gerstner water shader + matching TS function, one Kenney boat with buoyancy and 
 Wake emitters, shader integration, buoyancy integration. AI dummy boat to test wake interaction.
 
 **M3 — Multiplayer**
-PeerJS transport, share codes, TURN config, join flow, snapshot interpolation, kinematic remote boats, bumps. Network tests over loopback with latency. `DevSocketTransport`, dev relay, `dev:duo`, returning-peer reconnection and the multi-instance resync choreography (§13.4.5).
+PeerJS transport, share codes, TURN config, join flow, snapshot interpolation, remote hulls, bumps. Network tests over loopback with latency. `DevSocketTransport`, dev relay, `dev:duo`, returning-peer reconnection and the multi-instance resync choreography (§13.4.5).
 *Exit test: two players on different networks drive together and feel each other's wakes.*
 
 **M4 — Large world**

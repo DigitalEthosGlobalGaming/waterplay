@@ -5,17 +5,22 @@ import {
 import { restingBoatState } from '../core/boats/boat.ts';
 import type { EntityId } from '../core/interfaces/common.ts';
 import type { Platform } from '../core/interfaces/platform.ts';
-import type { PeerId } from '../core/interfaces/transport.ts';
-import { headingOf } from '../core/math/vec.ts';
+import type { PeerId, Transport } from '../core/interfaces/transport.ts';
+import { headingOf, quatFromYaw } from '../core/math/vec.ts';
 import { FixedStepAccumulator } from '../core/sim/fixed-step.ts';
 import { EntityIdAllocator } from '../core/sim/ids.ts';
-import { Sim } from '../core/sim/sim.ts';
+import { Sim, type SimOptions } from '../core/sim/sim.ts';
 import { applyTunableOverrides, getTunableOverrides } from '../data/registry.ts';
 import { simTunables } from '../data/sim.ts';
 import type { InputSnapshot } from '../input/actions.ts';
 import { InputSystem } from '../input/input-system.ts';
 import { GameRenderer, type RenderBoat } from '../render/game-renderer.ts';
 import { Hud } from '../ui/hud.ts';
+import { Menu } from '../ui/menu.ts';
+import { NameTags } from '../ui/name-tags.ts';
+import { NetStatusView } from '../ui/net-status.ts';
+import { Multiplayer } from './multiplayer.ts';
+import { randomPlayerName } from './player-name.ts';
 import type { RestoredSession, SessionState } from './session.ts';
 
 export interface GameOptions {
@@ -23,10 +28,18 @@ export interface GameOptions {
   uiRoot: HTMLElement;
   platform: Platform;
   seed: number;
+  /** A fresh transport for each host/join (PeerJS in the shipped game). */
+  createTransport: () => Transport;
 }
 
-/** Until M3 there's no network identity; ids look like the real thing. */
+/**
+ * Boats are keyed per owner on the wire (`${peer}/${entityId}`), so local ids
+ * don't need to be globally unique and stay stable across sessions.
+ */
 const LOCAL_PEER = 'local' as PeerId;
+
+/** New boats start somewhere on this ring around the origin, so friends don't spawn inside each other. */
+const SPAWN_RING = { min: 12, max: 40 };
 
 /**
  * Composition root (§4): wires core + adapters + input + render + ui. The only
@@ -37,6 +50,8 @@ export class Game {
   readonly input: InputSystem;
   readonly renderer: GameRenderer;
   readonly hud: Hud;
+  readonly menu: Menu;
+  readonly multiplayer: Multiplayer;
   readonly physics: RapierPhysicsWorld;
   sim: Sim;
   /** The boat this player drives. */
@@ -54,6 +69,8 @@ export class Game {
   private rafId = 0;
   private alpha = 1;
   private readonly onResize = () => this.renderer.resize();
+  private readonly netStatus: NetStatusView;
+  private readonly nameTags: NameTags;
 
   /** Rapier's WASM loads asynchronously, so construction is too. */
   static async create(opts: GameOptions): Promise<Game> {
@@ -63,10 +80,29 @@ export class Game {
   private constructor(opts: GameOptions, physics: RapierPhysicsWorld) {
     this.platform = opts.platform;
     this.physics = physics;
-    this.sim = new Sim({ physics, world: { seed: opts.seed } });
+    this.sim = this.createSim({ seed: opts.seed });
     this.input = new InputSystem(opts.canvas);
     this.renderer = new GameRenderer(opts.canvas);
     this.hud = new Hud(opts.uiRoot);
+    this.netStatus = new NetStatusView(opts.uiRoot);
+    this.nameTags = new NameTags(opts.uiRoot);
+    // The world is read through getters: applySession can swap the Sim.
+    const sim = () => this.sim;
+    this.multiplayer = new Multiplayer(
+      {
+        get seed() {
+          return sim().seed;
+        },
+        get worldClock() {
+          return sim().worldClock;
+        },
+        setWorldClock: (t) => sim().setWorldClock(t),
+        ownedBoats: () => [...sim().allBoats()].map((b) => b.state()),
+      },
+      opts.createTransport,
+    );
+    this.multiplayer.session.onNotice((text) => this.netStatus.notice(text));
+    this.menu = new Menu(opts.uiRoot, this.multiplayer, randomPlayerName);
     this.localBoatId = this.spawnLocalBoat();
     window.addEventListener('resize', this.onResize);
   }
@@ -77,10 +113,15 @@ export class Game {
       const frameSeconds = Math.min(0.25, (now - this.lastFrame) / 1000);
       this.lastFrame = now;
       const input = this.input.poll();
+      const menuOpen = this.menu.update(input, frameSeconds);
       if (!this.paused) {
-        this.applyControls(input);
+        // Multiplayer can't pause, so the menu just takes the boat's controls.
+        this.applyControls(menuOpen ? null : input);
         const { steps, alpha } = this.loop.advance(frameSeconds);
-        for (let i = 0; i < steps; i++) this.sim.step();
+        for (let i = 0; i < steps; i++) {
+          this.sim.step();
+          this.multiplayer.session.tick(simTunables.dt);
+        }
         this.alpha = alpha;
       }
       this.renderFrame(input, frameSeconds);
@@ -97,17 +138,19 @@ export class Game {
   dispose(): void {
     this.stop();
     window.removeEventListener('resize', this.onResize);
+    void this.multiplayer.leave();
     this.sim.dispose();
     this.physics.dispose();
     this.input.dispose();
     this.renderer.dispose();
     this.hud.dispose();
+    this.netStatus.dispose();
+    this.nameTags.dispose();
   }
 
   captureSession(): SessionState {
     return {
-      // Offline until M3 adds a transport to the game.
-      net: { role: 'offline', sessionCode: '', localPeerId: LOCAL_PEER },
+      net: this.multiplayer.snapshot(),
       local: {
         boats: [...this.sim.allBoats()].map((b) => b.state()),
         camera: { ...this.renderer.chase.state },
@@ -126,7 +169,7 @@ export class Game {
     if (s.local.devFlags) this.devFlags = { ...s.local.devFlags, ...this.devFlags };
     if (s.world) {
       this.sim.dispose();
-      this.sim = new Sim({ physics: this.physics, world: s.world });
+      this.sim = this.createSim(s.world);
     }
     if (s.local.boats?.length) {
       for (const b of [...this.sim.allBoats()]) this.sim.removeBoat(b.id);
@@ -138,18 +181,36 @@ export class Game {
     this.renderer.chase.resetSmoothing();
   }
 
-  private spawnLocalBoat(): EntityId {
-    return this.sim.addBoat(restingBoatState(this.ids.next(), 'speedboat', 0, 0)).id;
+  private createSim(world: SimOptions['world']): Sim {
+    const sim = new Sim({ physics: this.physics, world });
+    // Bump into what you see: other players' boats as drawn at that moment.
+    // (Optional chaining: the first Sim exists before multiplayer is set up.)
+    sim.remoteHulls = (t) => this.multiplayer?.session.remoteBoats(t) ?? [];
+    return sim;
   }
 
-  /** Game code reads actions, never keys (§14.4). */
-  private applyControls(input: InputSnapshot): void {
+  private spawnLocalBoat(): EntityId {
+    // App layer, so real randomness is fine here (§14.9 applies to core).
+    const angle = Math.random() * Math.PI * 2;
+    const r = SPAWN_RING.min + Math.random() * (SPAWN_RING.max - SPAWN_RING.min);
+    const state = restingBoatState(
+      this.ids.next(),
+      'speedboat',
+      Math.cos(angle) * r,
+      Math.sin(angle) * r,
+      quatFromYaw(Math.random() * Math.PI * 2),
+    );
+    return this.sim.addBoat(state).id;
+  }
+
+  /** Game code reads actions, never keys (§14.4). Null input lets go of everything. */
+  private applyControls(input: InputSnapshot | null): void {
     const boat = this.sim.getBoat(this.localBoatId);
     if (!boat) return;
     boat.controls = {
-      throttle: input.axis('throttle'),
-      steer: input.axis('steer'),
-      boost: input.held('boost'),
+      throttle: input?.axis('throttle') ?? 0,
+      steer: input?.axis('steer') ?? 0,
+      boost: input?.held('boost') ?? false,
     };
   }
 
@@ -159,12 +220,18 @@ export class Game {
       const pose = this.sim.interpolatedPose(b.id, this.alpha);
       if (pose) boats.push({ id: b.id, boatType: b.type, ...pose });
     }
+    // Interpolated like the boats so water and hulls stay in step.
+    const time = this.sim.worldClock - simTunables.dt * (1 - this.alpha);
+    const session = this.multiplayer.session;
+    const remotes = session.remoteBoats(time);
+    for (const r of remotes) {
+      boats.push({ id: r.key, boatType: r.boatType, position: r.position, rotation: r.rotation });
+    }
     const local = this.sim.getBoat(this.localBoatId);
     const localPose = boats.find((b) => b.id === this.localBoatId);
     this.renderer.render(
       {
-        // Interpolated like the boats so water and hulls stay in step.
-        time: this.sim.worldClock - simTunables.dt * (1 - this.alpha),
+        time,
         boats,
         focus:
           local && localPose
@@ -178,6 +245,18 @@ export class Game {
       input,
       frameSeconds,
     );
+    this.nameTags.update(
+      remotes.map((r) => ({
+        key: r.key,
+        name: r.name,
+        screen: this.renderer.screenPoint({
+          x: r.position.x,
+          y: r.position.y + 3,
+          z: r.position.z,
+        }),
+      })),
+    );
+    this.netStatus.update(session.status, session.players().length);
     if (local) {
       this.hud.update({
         speed: local.telemetry.speed,

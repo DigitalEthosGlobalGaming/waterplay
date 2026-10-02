@@ -2,6 +2,7 @@ import { platforms } from '../../data/platforms.ts';
 import { simTunables } from '../../data/sim.ts';
 import { waterParams } from '../../data/water.ts';
 import { Boat, type BoatState } from '../boats/boat.ts';
+import { applyRemoteContacts, type RemoteHull } from '../boats/contacts.ts';
 import type { EntityId, Quat, Vec3 } from '../interfaces/common.ts';
 import type { BodyHandle, PhysicsWorld } from '../interfaces/physics.ts';
 import { lerp3, slerp } from '../math/vec.ts';
@@ -47,6 +48,8 @@ export class Sim {
   /** Poses at the start of the last step, for render interpolation. Transient. */
   private readonly previousPoses = new Map<EntityId, Pose>();
   private readonly statics: BodyHandle[] = [];
+  /** Other players' boats at a given world time, for bumping (§8). Transient; set by the net layer. */
+  remoteHulls: (worldClock: number) => readonly RemoteHull[] = () => [];
 
   constructor(opts: SimOptions) {
     const init = opts.world;
@@ -70,6 +73,12 @@ export class Sim {
 
   get worldClock(): number {
     return this.clock;
+  }
+
+  /** Clients follow the host's clock (§8). Wrapped into the loop period. */
+  setWorldClock(t: number): void {
+    const period = simTunables.worldClockLoopPeriod;
+    this.clock = ((t % period) + period) % period;
   }
 
   /** Context handed to systems each tick. */
@@ -107,9 +116,11 @@ export class Sim {
   step(): void {
     const { dt, worldClockLoopPeriod, gravity } = simTunables;
     const water = this.water();
+    const remotes = this.remoteHulls(this.clock);
     for (const boat of this.boats.values()) {
       this.previousPoses.set(boat.id, this.physics.getTransform(boat.body));
       boat.applyForces(water, dt, gravity);
+      applyRemoteContacts(boat, remotes);
     }
     this.physics.step(dt);
     this.tickCount += 1;

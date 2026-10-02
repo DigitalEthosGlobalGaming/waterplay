@@ -4,13 +4,22 @@ A cosy, low-poly, open-water multiplayer boat game. Sail between floating platfo
 
 **Play in your browser:** https://digitalethosglobalgaming.github.io/waterplay/
 
-Controls: **W/S** throttle, **A/D** steer, **Shift** boost, drag the mouse to look. On a gamepad: **RT/LT** throttle, **left stick** steer, **A** boost, **right stick** look.
+Controls: **W/S** throttle, **A/D** steer, **Shift** boost, drag the mouse to look, **Esc** menu. On a gamepad: **RT/LT** throttle, **left stick** steer, **A** boost, **right stick** look, **Start** menu.
+
+## Playing with friends
+
+Open the menu (**Esc** / **Start**) and choose **Host a game**. You get a code like `K7M-Q4X`. Use **Copy invite link** and send the link to your friends. Opening it drops them straight into your game. They can also choose **Join a game** and type the code.
+
+- Players connect directly to the host over WebRTC. [PeerJS](https://peerjs.com)'s free server only introduces them.
+- If the host refreshes, everyone reconnects to the same code automatically.
+- Some strict networks (some offices, schools and mobile carriers) block direct connections and need a TURN relay. To add one, set `VITE_TURN_URL` (comma-separated), `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL` at build time. Cloudflare and Metered offer free tiers; both need an account.
 
 ## Status
 
 - **M0 — Scaffold:** done
 - **M1 — Boat in water:** Gerstner waves shared by physics and shader, a buoyant speedboat with weighted handling, a chase camera, a day/night cycle and live tuning
-- **Next:** M2 — wakes
+- **M3 — Multiplayer (part 1):** host/join with share codes and invite links, smooth remote boats, bumping, shared world clock, controller-friendly menu
+- **Next:** M3 part 2 (dev relay, multi-instance dev tooling), then M2 — wakes
 
 The design and roadmap are in [docs/architecture.md](docs/architecture.md).
 

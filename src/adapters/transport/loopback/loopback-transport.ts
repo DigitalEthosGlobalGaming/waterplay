@@ -89,7 +89,12 @@ export class LoopbackNetwork {
   }
 
   /** @internal */
-  registerHost(t: LoopbackTransport): string {
+  registerHost(t: LoopbackTransport, preferred?: string): string {
+    const wanted = preferred ? normalizeShareCode(preferred) : null;
+    if (wanted && !this.hosts.has(wanted)) {
+      this.hosts.set(wanted, t);
+      return wanted;
+    }
     let code: string;
     do code = generateShareCode(this.rng);
     while (this.hosts.has(code));
@@ -158,10 +163,10 @@ export class LoopbackTransport implements Transport {
     return this.state;
   }
 
-  async host(): Promise<{ shareCode: string }> {
+  async host(preferredCode?: string): Promise<{ shareCode: string }> {
     if (this.state !== 'disconnected')
       throw new Error('LoopbackTransport.host: already in a session');
-    this.shareCode = this.net.registerHost(this);
+    this.shareCode = this.net.registerHost(this, preferredCode);
     this.setState('connected');
     return { shareCode: this.shareCode };
   }
