@@ -16,6 +16,8 @@ export interface NetTunables {
   clockEaseRate: number;
   /** A client tries to get back to a vanished host for this long (s) before giving up. */
   reconnectWindow: number;
+  /** First retry comes this soon (s); each one after waits twice as long, up to reconnectInterval. */
+  reconnectFirstDelay: number;
   reconnectInterval: number;
   /** How long (s) a joining client waits for the host's Welcome. */
   welcomeTimeout: number;
@@ -36,6 +38,7 @@ export const netTunables = liveTunable<NetTunables>('net', {
   clockSnapThreshold: 1,
   clockEaseRate: 0.05,
   reconnectWindow: 20,
+  reconnectFirstDelay: 0.1,
   reconnectInterval: 2,
   welcomeTimeout: 10,
   staleTimeout: 10,

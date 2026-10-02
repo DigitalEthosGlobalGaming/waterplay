@@ -1,6 +1,7 @@
+import { BUILD_ID } from 'virtual:build-id';
 import type { Transport } from '../core/interfaces/transport.ts';
 import { NetSession, type NetWorld } from '../core/net/net-session.ts';
-import { formatShareCode, normalizeShareCode } from '../core/net/share-code.ts';
+import { formatShareCode } from '../core/net/share-code.ts';
 import { loadPlayerName, savePlayerName } from './player-name.ts';
 
 /** Per tab: a host that refreshes comes back on the same code so friends reconnect. */
@@ -28,7 +29,9 @@ export class Multiplayer {
       createTransport,
       world,
       name: loadPlayerName(),
-      buildId: __BUILD_ID__,
+      buildId: BUILD_ID,
+      // Dev instances wait for each other to finish reloading (§13.4.5).
+      strictBuild: import.meta.env.DEV,
     });
     // Keep the URL and tab storage in step with the session, so a refresh puts you back.
     this.session.onStatus((s) => {
@@ -65,6 +68,17 @@ export class Multiplayer {
     this.resumed = true;
     if (net.role === 'host') void this.session.host(net.sessionCode);
     else if (net.role === 'client') void this.session.join(net.sessionCode);
+  }
+
+  /**
+   * Dev instances on the relay (§13.4.5): the host always hosts the fixed dev
+   * code and clients keep trying to join it, whatever the snapshot said.
+   */
+  resumeDev(role: 'host' | 'client', code: string): void {
+    if (this.resumed) return;
+    this.resumed = true;
+    if (role === 'host') void this.session.host(code);
+    else void this.session.join(code, { keepTrying: true });
   }
 
   snapshot(): NetSnapshot {

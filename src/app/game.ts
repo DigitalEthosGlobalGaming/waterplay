@@ -131,6 +131,9 @@ export class Game {
           this.multiplayer.session.tick(simTunables.dt);
         }
         this.alpha = alpha;
+      } else {
+        // Restoring or resyncing (§13.4.4): the world waits, the network doesn't.
+        this.multiplayer.session.tick(frameSeconds);
       }
       this.renderFrame(input, frameSeconds);
       for (const hook of this.frameHooks) hook(frameSeconds);

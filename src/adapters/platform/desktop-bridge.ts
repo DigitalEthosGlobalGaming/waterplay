@@ -11,6 +11,8 @@ export interface DevBridge {
   instance: string;
   role: 'host' | 'client';
   fresh: boolean;
+  /** Dev relay to connect through, when the orchestrator started one (§13.4.5). */
+  relayUrl: string | null;
   /** Synchronous so it can run inside `vite:beforeFullReload` before the page unloads. */
   loadSession(): string | null;
   saveSession(json: string): void;

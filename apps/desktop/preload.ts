@@ -9,7 +9,7 @@ const bridge: DesktopBridge = {};
 if (__DEV__) {
   const info = ipcRenderer.sendSync(DEV_IPC.info) as Pick<
     DevBridge,
-    'instance' | 'role' | 'fresh'
+    'instance' | 'role' | 'fresh' | 'relayUrl'
   > | null;
   // null when a dev build runs without the orchestrator.
   if (info) {

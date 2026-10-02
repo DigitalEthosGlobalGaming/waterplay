@@ -31,8 +31,21 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // Dev instances sit side by side, often behind an editor. Chromium stops
+      // requestAnimationFrame in covered windows, which would freeze the sim and
+      // the reconnect loop of whichever instance isn't on top.
+      backgroundThrottling: !isDev,
     },
   });
+  if (isDev) {
+    // Renderer logs land in the orchestrator's terminal, prefixed per instance (§13.4.2).
+    win.webContents.on('console-message', (e) => {
+      if (e.message.includes('Electron Security Warning')) return;
+      if (e.level === 'warning' || e.level === 'error' || e.message.startsWith('[')) {
+        console.log(`(${e.level}) ${e.message}`);
+      }
+    });
+  }
   if (isDev && args.devServerUrl) void win.loadURL(args.devServerUrl);
   else void win.loadFile(join(__dirname, '../dist/web/index.html'));
   return win;

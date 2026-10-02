@@ -14,6 +14,7 @@ export class DevIndicator {
     private readonly instance: string,
     private readonly role: string,
     private readonly buildId: string,
+    private readonly netText: () => string,
   ) {
     this.el.className = 'dev-indicator';
     this.details.hidden = true;
@@ -49,6 +50,6 @@ export class DevIndicator {
 
   private render(): void {
     const ago = ((performance.now() - this.restoredAt) / 1000).toFixed(0);
-    this.summary.textContent = `${this.instance} · ${this.role} · build ${this.buildId} · offline · ${this.restoreText} ${ago}s ago`;
+    this.summary.textContent = `${this.instance} · ${this.role} · build ${this.buildId} · ${this.netText()} · ${this.restoreText} ${ago}s ago`;
   }
 }

@@ -6,6 +6,8 @@ export interface DesktopArgs {
   slot: number;
   slots: number;
   sessionsDir: string | null;
+  /** ws:// URL of tools/dev-relay.ts; instances connect through it (§13.4.5). */
+  relayUrl: string | null;
   fresh: boolean;
 }
 
@@ -21,6 +23,7 @@ export function parseDesktopArgs(argv: readonly string[]): DesktopArgs {
     slot: Number(get('dev-slot') ?? 0),
     slots: Math.max(1, Number(get('dev-slots') ?? 1)),
     sessionsDir: get('dev-sessions-dir'),
+    relayUrl: get('dev-relay-url'),
     fresh: argv.includes('--fresh'),
   };
 }

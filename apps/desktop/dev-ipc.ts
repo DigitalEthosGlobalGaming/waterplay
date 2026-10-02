@@ -15,7 +15,9 @@ export function installDevIpc(
 ): void {
   // Always answered so the preload's sendSync never waits on a missing handler.
   ipcMain.on(DEV_IPC.info, (e) => {
-    e.returnValue = isDev ? { instance: args.instance, role: args.role, fresh: args.fresh } : null;
+    e.returnValue = isDev
+      ? { instance: args.instance, role: args.role, fresh: args.fresh, relayUrl: args.relayUrl }
+      : null;
   });
   if (!isDev) return;
 

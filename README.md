@@ -23,7 +23,8 @@ Open the menu (**Esc** / **Start**) and choose **Host a game**. You get a code l
 - **M3 — Multiplayer (part 1):** host/join with share codes and invite links, smooth remote boats, bumping, shared world clock, controller-friendly menu
 - **M2 — Wakes:** every boat leaves a V-shaped wake with foam, and other boats' wakes (including friends') rock you
 - **Boats:** pick from five boats in the menu (speedboat, racer, fan boat, fishing boat, tug), each with its own speed, handling, weight and wake
-- **Next:** M3 part 2 (dev relay, multi-instance dev tooling), then M4 — large world
+- **M3 — Multiplayer (part 2):** `npm run dev:duo` / `dev:trio` instances connect to each other through a local relay and stay connected through every code reload and restart
+- **Next:** M4 — large world
 
 The design and roadmap are in [docs/architecture.md](docs/architecture.md).
 
@@ -35,6 +36,7 @@ Requires Node 24.
 npm install
 npm run dev          # browser at http://localhost:5173 (tuning panel top right)
 npm run dev:desktop  # Electron with hot reload and session restore
+npm run dev:duo      # two connected Electron instances (A hosts, B joins); dev:trio for three
 npm run check        # typecheck + lint + tests
 ```
 

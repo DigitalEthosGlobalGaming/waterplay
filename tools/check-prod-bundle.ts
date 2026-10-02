@@ -10,6 +10,8 @@ const FORBIDDEN = [
   'dev:session-save',
   'dev:session-clear',
   'DevSocketTransport',
+  'dev relay',
+  'DEVDEV',
   'installDevSession',
   'waterplay.devSession',
   'lil-gui',

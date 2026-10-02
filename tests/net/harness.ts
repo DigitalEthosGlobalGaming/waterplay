@@ -57,11 +57,24 @@ export class FakeWorld implements NetWorld {
   }
 }
 
+export interface PeerOptions {
+  startClock?: number;
+  phase?: number;
+  wrap?: (t: Transport) => Transport;
+  /** Fixed peer id for every transport, like a dev instance (`dev-A`). Default: a new id each time. */
+  peerId?: string;
+  buildId?: string;
+  strictBuild?: boolean;
+}
+
 export interface Peer {
   name: string;
   world: FakeWorld;
   session: NetSession;
   notices: string[];
+  /** Transports created so far (one per host/join attempt). */
+  attempts: number;
+  opts: PeerOptions;
 }
 
 /** Peers sharing one LoopbackNetwork, stepped together at the sim rate. */
@@ -74,24 +87,55 @@ export class Harness {
     this.net = new LoopbackNetwork({ conditions, seed });
   }
 
-  addPeer(
-    name: string,
-    opts: { startClock?: number; phase?: number; wrap?: (t: Transport) => Transport } = {},
-  ): Peer {
+  addPeer(name: string, opts: PeerOptions = {}): Peer {
     const world = new FakeWorld(`${name}:1`, opts.startClock ?? 0, opts.phase ?? 0);
-    const session = new NetSession({
-      createTransport: () => {
-        const t = this.net.createTransport(`${name}-${++this.transports}`);
-        return opts.wrap ? opts.wrap(t) : t;
-      },
-      world,
+    const peer: Peer = {
       name,
-      buildId: 'test',
-    });
-    const peer = { name, world, session, notices: [] as string[] };
-    session.onNotice((n) => peer.notices.push(n));
+      world,
+      session: null as unknown as NetSession,
+      notices: [],
+      attempts: 0,
+      opts,
+    };
+    peer.session = this.newSession(peer);
     this.peers.push(peer);
     return peer;
+  }
+
+  /**
+   * The page reloads (§13.4.5): the old session vanishes without a goodbye and a
+   * new one starts with the same world (restored from its snapshot) and peer id.
+   * The caller hosts or joins again, as the restored app would.
+   */
+  async reload(
+    peer: Peer,
+    opts: Partial<PeerOptions> & {
+      /** The old page dies without its connection closing; the host only hears the new hello. */
+      silent?: boolean;
+    } = {},
+  ): Promise<void> {
+    // Silent: the old session is just abandoned (no more ticks), its transport left open.
+    if (!opts.silent) await peer.session.leave();
+    peer.opts = { ...peer.opts, ...opts };
+    peer.notices.length = 0;
+    peer.session = this.newSession(peer);
+  }
+
+  private newSession(peer: Peer): NetSession {
+    const { opts, name } = peer;
+    const session = new NetSession({
+      createTransport: () => {
+        peer.attempts++;
+        const t = this.net.createTransport(opts.peerId ?? `${name}-${++this.transports}`);
+        return opts.wrap ? opts.wrap(t) : t;
+      },
+      world: peer.world,
+      name,
+      buildId: opts.buildId ?? 'test',
+      strictBuild: opts.strictBuild,
+    });
+    session.onNotice((n) => peer.notices.push(n));
+    return session;
   }
 
   /** Run every peer for `seconds` of sim time, delivering network traffic as it goes. */

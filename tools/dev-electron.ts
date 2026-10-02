@@ -2,10 +2,12 @@
  * Dev orchestrator (§13.4.2): Vite + esbuild watchers for main/preload + N Electron
  * instances, with coordinated save-and-restart when main/preload change.
  *
- *   tsx tools/dev-electron.ts --instances=2 [--fresh]
+ *   tsx tools/dev-electron.ts --instances=2 [--fresh] [--sessions-dir=path]
  *
- * The dev relay (tools/dev-relay.ts) and DevSocketTransport are added in M3; until
- * then multiple instances run side by side but aren't connected.
+ * With more than one instance it also starts the dev relay (tools/dev-relay.ts):
+ * instance A hosts and the others join it over localhost, reconnecting by
+ * themselves after every reload or restart (§13.4.5). A single instance plays
+ * online through PeerJS like the shipped game.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -14,6 +16,7 @@ import { createInterface } from 'node:readline';
 import { context, type Plugin } from 'esbuild';
 import { createServer } from 'vite';
 import { ORCHESTRATOR } from '../apps/desktop/protocol.ts';
+import { startDevRelay } from './dev-relay.ts';
 import { electronBuildOptions } from './electron-esbuild.ts';
 
 const SAVE_TIMEOUT_MS = 1000;
@@ -22,7 +25,8 @@ const CLIENT_LAUNCH_DELAY_MS = 300;
 const argv = process.argv.slice(2);
 const instanceCount = Math.max(1, Number(flag('instances') ?? 1));
 const freshOnFirstLaunch = argv.includes('--fresh');
-const sessionsDir = resolve('.dev-sessions');
+// --sessions-dir= keeps a test run from touching your own .dev-sessions.
+const sessionsDir = resolve(flag('sessions-dir') ?? '.dev-sessions');
 // require('electron') from Node returns the path to the Electron binary.
 const electronBin = createRequire(import.meta.url)('electron') as string;
 
@@ -59,7 +63,11 @@ const devServerUrl = vite.resolvedUrls?.local[0];
 if (!devServerUrl) throw new Error('Vite did not report a local URL');
 log('dev', `Vite ready at ${devServerUrl}`);
 
-// 2. esbuild watchers for main + preload; first build launches, later builds restart.
+// 2. Dev relay, so instances connect to each other without PeerJS or share codes.
+const relay = instanceCount > 1 ? await startDevRelay({ log: (m) => log('relay', m) }) : null;
+if (relay) log('relay', `listening on ${relay.url}`);
+
+// 3. esbuild watchers for main + preload; first build launches, later builds restart.
 let firstBuild = true;
 const onRebuild: Plugin = {
   name: 'waterplay-restart',
@@ -102,6 +110,7 @@ function launch(inst: Instance, fresh: boolean): void {
     `--dev-slot=${inst.slot}`,
     `--dev-slots=${instanceCount}`,
     `--dev-sessions-dir=${sessionsDir}`,
+    ...(relay ? [`--dev-relay-url=${relay.url}`] : []),
     ...(fresh ? ['--fresh'] : []),
   ];
   const proc = spawn(electronBin, args, { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
@@ -170,6 +179,7 @@ async function shutdown(): Promise<void> {
   await Promise.all(instances.map(requestSave));
   await Promise.all(instances.map(kill));
   await esb.dispose();
+  await relay?.close();
   await vite.close();
   process.exit(0);
 }

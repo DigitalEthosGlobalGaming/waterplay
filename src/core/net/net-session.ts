@@ -32,6 +32,12 @@ export interface NetSessionOptions {
   world: NetWorld;
   name: string;
   buildId: string;
+  /**
+   * Host turns away clients on a different build (dev, §13.4.5). They keep
+   * retrying, since the older side is about to reload. Off in production, where
+   * any two builds with the same PROTOCOL_VERSION can play together.
+   */
+  strictBuild?: boolean;
 }
 
 export interface NetPlayer {
@@ -54,6 +60,9 @@ interface Remote {
   /** Session time the last state arrived. */
   heardAt: number;
 }
+
+/** Reject reason: the host is on a different build. Retried, not fatal. */
+export const REJECT_BUILD = 'build';
 
 export const INCOMPATIBLE_MESSAGE =
   'That game is running a different version of Waterplay. Refresh both pages to update.';
@@ -91,7 +100,15 @@ export class NetSession {
   private clockSynced = false;
   private pendingClockCorrection = 0;
   private welcomeDeadline = Number.POSITIVE_INFINITY;
-  private reconnect: { until: number; nextAttemptAt: number; attempting: boolean } | null = null;
+  private reconnect: {
+    until: number;
+    nextAttemptAt: number;
+    /** Seconds until the next attempt after this one; doubles up to reconnectInterval. */
+    backoff: number;
+    attempting: boolean;
+  } | null = null;
+  /** Shown once per wait, so retries against an old-build host don't spam. */
+  private waitingForBuild = false;
 
   private readonly statusCbs = new Set<(s: NetStatus) => void>();
   private readonly noticeCbs = new Set<(text: string) => void>();
@@ -169,7 +186,11 @@ export class NetSession {
     }
   }
 
-  async join(input: string): Promise<void> {
+  /**
+   * `keepTrying` retries for the reconnect window instead of failing when
+   * nobody is hosting yet (dev instances starting together).
+   */
+  async join(input: string, opts: { keepTrying?: boolean } = {}): Promise<void> {
     const code = normalizeShareCode(input);
     if (!code) {
       this.setStatus({
@@ -180,6 +201,11 @@ export class NetSession {
     }
     await this.teardown();
     this.setStatus({ kind: 'joining', code });
+    if (opts.keepTrying) {
+      this.code = code;
+      this.startRetrying(0);
+      return;
+    }
     await this.connect(code);
   }
 
@@ -200,7 +226,7 @@ export class NetSession {
     }
 
     this.tickReconnect();
-    if (this._status.kind === 'joining' && this.elapsed > this.welcomeDeadline) {
+    if (this._status.kind === 'joining' && !this.reconnect && this.elapsed > this.welcomeDeadline) {
       void this.fail("The host didn't answer. Check the code and try again.");
       return;
     }
@@ -297,6 +323,7 @@ export class NetSession {
   private async teardown(): Promise<void> {
     this.generation++;
     this.reconnect = null;
+    this.waitingForBuild = false;
     await this.dropTransport();
   }
 
@@ -326,19 +353,45 @@ export class NetSession {
     const name = this.hostId ? this.roster.get(this.hostId) : undefined;
     this.notice(`Lost ${name ? `${name}'s` : 'the'} game, trying to reconnect…`);
     void this.dropTransport();
+    this.startRetrying(netTunables.reconnectFirstDelay);
+    this.setStatus({ kind: 'reconnecting', code: this.code });
+  }
+
+  /** Keep trying this.code for the reconnect window, backing off between attempts. */
+  private startRetrying(firstDelay: number): void {
+    if (this.reconnect) return;
     this.reconnect = {
       until: this.elapsed + netTunables.reconnectWindow,
-      nextAttemptAt: this.elapsed + 0.5,
+      nextAttemptAt: this.elapsed + firstDelay,
+      backoff: Math.max(firstDelay, netTunables.reconnectFirstDelay),
       attempting: false,
     };
-    this.setStatus({ kind: 'reconnecting', code: this.code });
+  }
+
+  /** The host is on another build: one of us is about to reload, so wait and retry. */
+  private waitForBuild(): void {
+    void this.dropTransport();
+    this.startRetrying(netTunables.reconnectFirstDelay);
+    if (this._status.kind === 'connected')
+      this.setStatus({ kind: 'reconnecting', code: this.code });
+    if (!this.waitingForBuild) {
+      this.waitingForBuild = true;
+      this.notice('Waiting for the host to reload…');
+    }
   }
 
   private tickReconnect(): void {
     const r = this.reconnect;
     if (!r) return;
     if (this.elapsed > r.until && !r.attempting) {
-      void this.fail('Lost connection to the host.');
+      const joining = this._status.kind === 'joining';
+      void this.fail(
+        this.waitingForBuild
+          ? INCOMPATIBLE_MESSAGE
+          : joining
+            ? "Couldn't find the host's game."
+            : 'Lost connection to the host.',
+      );
       return;
     }
     if (this.transport) {
@@ -348,7 +401,8 @@ export class NetSession {
     }
     if (r.attempting || this.elapsed < r.nextAttemptAt) return;
     r.attempting = true;
-    r.nextAttemptAt = this.elapsed + netTunables.reconnectInterval;
+    r.nextAttemptAt = this.elapsed + r.backoff;
+    r.backoff = Math.min(r.backoff * 2, Math.max(netTunables.reconnectInterval, r.backoff));
     void this.connect(this.code).then(() => {
       r.attempting = false;
     });
@@ -376,10 +430,17 @@ export class NetSession {
     const known = this.roster.has(from);
     switch (msg.type) {
       case 'hello': {
-        if (known) return;
         const local = this.localId;
         if (!local) return;
+        if (this.opts.strictBuild && msg.buildId !== this.opts.buildId) {
+          this.send(from, 'reliable', { type: 'reject', reason: REJECT_BUILD });
+          return;
+        }
+        // The same peer id again: a dev instance that reloaded, or a client whose
+        // connection dropped and came back. Same player, fresh session (§13.4.5).
+        const returning = known || this.departed.has(from);
         this.departed.delete(from);
+        this.lastSeq.delete(from);
         this.roster.set(from, msg.name);
         const players = [...this.roster].map(([peerId, name]) => ({ peerId, name }));
         const world = this.opts.world;
@@ -394,7 +455,7 @@ export class NetSession {
           type: 'playerJoined',
           player: { peerId: from, name: msg.name },
         });
-        this.notice(`${msg.name} joined`);
+        this.notice(returning ? `${msg.name} is back` : `${msg.name} joined`);
         return;
       }
       case 'playerJoined':
@@ -431,15 +492,17 @@ export class NetSession {
         this.clockSynced = false;
         this.nextPingAt = this.elapsed;
         this.welcomeDeadline = Number.POSITIVE_INFINITY;
-        const rejoined = this.reconnect !== null;
+        const rejoined = this._status.kind === 'reconnecting';
         this.reconnect = null;
+        this.waitingForBuild = false;
         this.setStatus({ kind: 'connected', code: this.code });
         const hostName = this.roster.get(from) ?? 'the host';
         this.notice(rejoined ? `Back in ${hostName}'s game` : `Joined ${hostName}'s game`);
         return;
       }
       case 'reject':
-        void this.fail(msg.reason === 'version' ? INCOMPATIBLE_MESSAGE : msg.reason);
+        if (msg.reason === REJECT_BUILD) this.waitForBuild();
+        else void this.fail(msg.reason === 'version' ? INCOMPATIBLE_MESSAGE : msg.reason);
         return;
       case 'playerJoined': {
         const id = msg.player.peerId as PeerId;
@@ -447,6 +510,8 @@ export class NetSession {
         const isNew = !this.roster.has(id);
         this.roster.set(id, msg.player.name);
         this.departed.delete(id);
+        // A returning peer restarts its sequence numbers.
+        this.lastSeq.delete(id);
         if (isNew && this._status.kind === 'connected') this.notice(`${msg.player.name} joined`);
         return;
       }

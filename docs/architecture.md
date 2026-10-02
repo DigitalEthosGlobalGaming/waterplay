@@ -870,6 +870,18 @@ Orchestrator:                 kill all → relaunch all with the same flags → 
 
 **Returning peers in production too.** "Peer with a known ID reconnects and reclaims its boat" is the same logic as a real player recovering from a dropped connection, so this dev work directly pays off in the shipping game.
 
+**As built (M3):**
+
+- `tools/dev-relay.ts` is a `ws` server on `127.0.0.1` (random port), started by the orchestrator when there's more than one instance. It routes binary frames between members of a session and tells hosts and clients when peers come and go. A socket that connects with a peer id already in use replaces the old one, so a reload looks like leave then join.
+- `DevSocketTransport` (`src/adapters/transport/devsocket/`) speaks to it; `apps/web/main.ts` picks it when the preload reports a relay URL. Ids are `dev-A`, `dev-B`…; the code is always `DEV-DEV`.
+- The build id comes from `virtual:build-id` (`tools/vite-build-id.ts`). In dev it gains a counter on every edit that reloads the page, so peers can tell old code from new. `NetSession` with `strictBuild` (dev only) rejects a mismatched `Hello` with reason `build`; the client shows "Waiting for the host to reload…" and keeps retrying instead of failing.
+- Reconnects back off from 0.1 s, doubling up to 2 s, for the 20 s window. `join(code, { keepTrying: true })` uses the same loop, so a client that starts before its host just waits.
+- A host that gets a `Hello` from a peer id it already knows (or saw leave) re-welcomes it as the same player ("B is back"). Everyone forgets that peer's last sequence number, since a reloaded page starts counting from 1.
+- After a restore, relay instances hold the sim (`game.paused`) until they're back online or 3 s pass; the network keeps ticking while paused.
+- Dev windows set `backgroundThrottling: false`: Chromium stops `requestAnimationFrame` in covered windows, which would freeze the sim and the reconnect loop of whichever instance isn't on top.
+- Renderer warnings, errors and `[tag]` logs are forwarded to the orchestrator terminal as `[A]`, `[B]`.
+- Not done yet: `remoteBoatsLastKnown` in the host snapshot (clients' boats vanish for the second or so it takes them to reconnect).
+
 #### 13.4.6 Hot-swap details
 
 - **Data modules:** each file in `src/data` that is safe to hot-swap calls `import.meta.hot.accept(newModule => registry.update(newModule))`. Systems read tunables from the registry each tick (or subscribe to changes), never cache them at startup.
@@ -930,7 +942,7 @@ Gerstner water shader + matching TS function, one Kenney boat with buoyancy and 
 **M2 — Wakes**
 Wake emitters, shader integration, buoyancy integration. AI dummy boat to test wake interaction.
 
-**M3 — Multiplayer**
+**M3 — Multiplayer** *(done)*
 PeerJS transport, share codes, TURN config, join flow, snapshot interpolation, remote hulls, bumps. Network tests over loopback with latency. `DevSocketTransport`, dev relay, `dev:duo`, returning-peer reconnection and the multi-instance resync choreography (§13.4.5).
 *Exit test: two players on different networks drive together and feel each other's wakes.*
 

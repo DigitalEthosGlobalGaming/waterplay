@@ -1,5 +1,7 @@
-/** Injected by Vite `define` (vite.config.ts / vitest.config.ts). */
-declare const __BUILD_ID__: string;
+/** Provided by tools/vite-build-id.ts. Changes with every page-reloading edit in dev. */
+declare module 'virtual:build-id' {
+  export const BUILD_ID: string;
+}
 
 /** Optional build-time settings (see README, "Playing online"). */
 interface ImportMetaEnv {
