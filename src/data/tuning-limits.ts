@@ -24,6 +24,9 @@ const LOWER_BOUNDS: Record<string, { min: number; inclusive: boolean }> = {
   dragForwardLinear: { min: 0, inclusive: true },
   dragSideways: { min: 0, inclusive: true },
   dragVertical: { min: 0, inclusive: true },
+  wakeScale: { min: 0, inclusive: true },
+  cameraScale: { min: 0, inclusive: false },
+  modelScale: { min: 0, inclusive: false },
   // Wakes: a zero interval would drop an emitter every step and starve the shader's 256.
   dropInterval: { min: 0.02, inclusive: true },
   lifetime: { min: 0, inclusive: false },

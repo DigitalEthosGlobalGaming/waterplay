@@ -14,10 +14,12 @@ export interface ChaseTarget {
   heading: number;
   /** m/s */
   speed: number;
+  /** Bigger boats pull the camera back and up. Default 1. */
+  scale?: number;
 }
 
 /**
- * Chase camera (§7.3): springs behind the boat, lags on turns, pulls back and
+ * Chase camera (§7.4): springs behind the boat, lags on turns, pulls back and
  * widens with speed, and never rolls (horizon-stabilised). Players can swing it
  * with the camera action; it drifts back behind the boat once they let go.
  */
@@ -54,9 +56,11 @@ export class ChaseCamera {
     this.state.yaw = wrapAngle(this.state.yaw);
     this.state.pitch = MathUtils.clamp(this.state.pitch, t.minPitch, t.maxPitch);
 
+    const scale = target.scale ?? 1;
+    const restDistance = t.distance * scale;
     if (!this.hasFocus) {
       this.focus.copy(target.position);
-      this.distance = t.distance + target.speed * t.distancePerSpeed;
+      this.distance = restDistance + target.speed * t.distancePerSpeed;
       this.hasFocus = true;
     }
     const k = smoothing(t.positionFollowRate, dt);
@@ -65,7 +69,7 @@ export class ChaseCamera {
     this.focus.y += (target.position.y - this.focus.y) * smoothing(t.verticalFollowRate, dt);
 
     const zoom = smoothing(t.zoomFollowRate, dt);
-    this.distance += (t.distance + target.speed * t.distancePerSpeed - this.distance) * zoom;
+    this.distance += (restDistance + target.speed * t.distancePerSpeed - this.distance) * zoom;
     const speedFov = t.fov + t.fovBoost * MathUtils.clamp(target.speed / t.fovSpeedRef, 0, 1);
     this.fov += (speedFov - this.fov) * zoom;
 
@@ -78,7 +82,7 @@ export class ChaseCamera {
     }
 
     const { yaw, pitch } = this.state;
-    const lookY = this.focus.y + t.targetHeight;
+    const lookY = this.focus.y + t.targetHeight * scale;
     c.position.set(
       this.focus.x + Math.sin(yaw) * Math.cos(pitch) * this.distance,
       lookY + Math.sin(pitch) * this.distance,

@@ -9,7 +9,7 @@ import type { BoatState } from '../boats/boat.ts';
  * versions can't decode each other, so the version byte is checked before
  * anything else and mismatches are reported instead of misread.
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 const TYPE = {
   hello: 1,

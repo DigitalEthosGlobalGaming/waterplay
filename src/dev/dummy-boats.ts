@@ -2,6 +2,7 @@ import type { Game } from '../app/game.ts';
 import { restingBoatState } from '../core/boats/boat.ts';
 import type { EntityId } from '../core/interfaces/common.ts';
 import { headingOf, quatFromYaw, rotate } from '../core/math/vec.ts';
+import { BOAT_TYPE_IDS } from '../data/boats.ts';
 
 export interface DummyBoats {
   spawn(): void;
@@ -18,6 +19,7 @@ const DUMMY_CONTROLS = { throttle: 0.9, steer: 0.25, boost: false };
  */
 export function installDummyBoats(game: Game): DummyBoats {
   const dummies = new Set<EntityId>();
+  let spawned = 0;
 
   game.frameHooks.add(() => {
     for (const id of dummies) {
@@ -36,10 +38,12 @@ export function installDummyBoats(game: Game): DummyBoats {
       const rotation = quatFromYaw(heading);
       const offset = rotate(rotation, { x: -15 * (dummies.size + 1), y: 0, z: 30 });
       const id = game.nextEntityId();
+      // Each dummy is the next boat in the lineup, so every wake size gets a look.
+      const type = BOAT_TYPE_IDS[spawned++ % BOAT_TYPE_IDS.length] ?? 'speedboat';
       game.sim.addBoat(
         restingBoatState(
           id,
-          'speedboat',
+          type,
           at.x + offset.x,
           at.z + offset.z,
           quatFromYaw(heading + Math.PI / 2),

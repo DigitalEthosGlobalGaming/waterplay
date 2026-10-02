@@ -1,6 +1,6 @@
 import { liveTunable } from './registry.ts';
 
-/** Chase camera (§7.3). Rates are "per second" for exponential smoothing. */
+/** Chase camera (§7.4). Rates are "per second" for exponential smoothing. */
 export interface CameraTunables {
   fov: number;
   /** Extra FOV (degrees) at fovSpeedRef and above. */

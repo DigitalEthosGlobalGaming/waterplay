@@ -25,6 +25,8 @@ export interface WakeSource {
   z: number;
   vx: number;
   vz: number;
+  /** Multiplier on wake height (heavy boats push more water). Default 1. */
+  scale?: number;
 }
 
 /**
@@ -88,7 +90,8 @@ export class WakeField {
         if (since >= 0 && since < p.dropInterval) continue;
       }
       this.lastDrop.set(s.id, t);
-      e.push({ owner: s.id, x: s.x, z: s.z, t0: t, amplitude: wakeAmplitude(speed, p) });
+      const amplitude = wakeAmplitude(speed, p) * (s.scale ?? 1);
+      e.push({ owner: s.id, x: s.x, z: s.z, t0: t, amplitude });
     }
     for (const id of this.lastDrop.keys()) if (!present.has(id)) this.lastDrop.delete(id);
     if (e.length > MAX_WAKE_EMITTERS) e.splice(0, e.length - MAX_WAKE_EMITTERS);

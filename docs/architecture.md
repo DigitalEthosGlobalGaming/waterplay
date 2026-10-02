@@ -289,7 +289,7 @@ Boats should feel heavy: slow to start, slow to stop, carve wide turns at speed,
    - Forward: low drag (boats glide).
    - Sideways: **high** drag (the keel effect; this is what makes turns carve instead of sliding).
    - Vertical: medium drag (damps bobbing).
-4. **Thrust** at the stern, below the waterline. Throttle **ramps** toward target (`throttleResponse`), never instant. No thrust when the propeller point is out of the water.
+4. **Thrust** at the stern, below the waterline. Throttle **ramps** toward target (`throttleResponse`), never instant. No thrust when the propeller point is out of the water, except on boats with `propellerInAir` (the fan boat), whose fan also steers the same way in reverse.
 5. **Rudder/steering** as a sideways force at the stern, scaled by forward speed. Slow boats turn poorly; stationary boats barely turn. Small idle turn assist so players never feel stuck.
 6. **Angular damping** high on roll/pitch, moderate on yaw.
 7. **Cargo mass:** inventory contents add mass. A full cargo hold genuinely handles worse.
@@ -312,12 +312,29 @@ interface BoatHandling {
   rudderSpeedCurve: [speed: number, factor: number][];
   angularDamping: Vec3;
   cargoGrid: { width: number; height: number };
+  propellerInAir: boolean;    // fan boats: thrust and steering work out of the water
 }
 ```
 
+Each `BoatType` also has a name, a one-line description, a Kenney model and scale, a hull box, `wakeScale` (heavier boats push bigger wakes) and `cameraScale` (the chase camera sits further back on bigger boats).
+
 All of these are exposed in lil-gui in dev builds with a "copy as TS" button so good values can be pasted back into the data file.
 
-### 7.3 Camera
+### 7.3 Boat lineup
+
+Players pick a boat from the pause menu (**Boat: …**). The swap happens where they are: same entity id, position, heading and horizontal velocity, with the throttle reset (`Sim.changeBoatType`). The choice is remembered in localStorage (`waterplay.boatType`) for the next spawn; the current boat is in the session snapshot as usual. Remote peers see the new `boatType` in the next state message and rebuild the model.
+
+| Boat | Model | Character |
+| --- | --- | --- |
+| Speedboat | `boat-speed-a` | All-rounder, the reference tuning |
+| Racer | `boat-speed-j` | Fastest and lightest, twitchy, thrown about by wakes |
+| Fan boat | `boat-fan` | Air propeller: slides through turns, spins on the spot |
+| Fishing boat | `boat-fishing-small` | Heavy and steady, biggest hold |
+| Tug | `boat-tug-a` | Very heavy and strong, slow, wins bumps, big wake |
+
+Each boat's physics comes from its model's measured size: buoyancy points follow the speedboat's layout scaled to the hull, and buoyancy strength sets the draft. The picker's stat bars (`core/boats/stats.ts`) are computed from handling, so they can't drift from the physics. `tests/sim/boat-types.test.ts` checks every boat floats, survives waves, rights itself and turns, and that the top-speed order holds.
+
+### 7.4 Camera
 
 Chase camera with spring damping, lags slightly on turns (sells weight), pulls back with speed, gentle FOV increase at top speed. Horizon-stabilised so roll doesn't make players sick.
 

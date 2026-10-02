@@ -1,3 +1,4 @@
+import { type StatName, statBars } from '../core/boats/stats.ts';
 import type { NetPlayer, NetStatus } from '../core/net/net-session.ts';
 import { MAX_NAME_LENGTH } from '../core/net/protocol.ts';
 import {
@@ -6,6 +7,7 @@ import {
   SHARE_CODE_ALPHABET,
   SHARE_CODE_LENGTH,
 } from '../core/net/share-code.ts';
+import { BOAT_TYPE_IDS, type BoatTypeId, boatTypes } from '../data/boats.ts';
 import type { ActiveDevice, InputSnapshot } from '../input/actions.ts';
 import { FocusManager, type NavDirection } from './focus-manager.ts';
 
@@ -25,7 +27,21 @@ export interface MenuNet {
   inviteLink(): string | null;
 }
 
-type Screen = 'main' | 'join' | 'name';
+/** What the menu needs to show and change the player's boat. */
+export interface MenuBoats {
+  current(): BoatTypeId;
+  choose(type: BoatTypeId): void;
+}
+
+type Screen = 'main' | 'join' | 'name' | 'boat';
+
+const STAT_LABELS: [StatName, string][] = [
+  ['topSpeed', 'Speed'],
+  ['acceleration', 'Acceleration'],
+  ['turning', 'Turning'],
+  ['weight', 'Weight'],
+  ['cargo', 'Cargo'],
+];
 
 const HINTS: Record<ActiveDevice, string> = {
   kbm: '<kbd>↑↓</kbd> Move · <kbd>Enter</kbd> Select · <kbd>Esc</kbd> Back',
@@ -36,7 +52,7 @@ const PAD_CODE_HINT =
   '<kbd>↑↓</kbd> Letter · <kbd>←→</kbd> Move · <kbd>A</kbd> Join · <kbd>B</kbd> Back';
 
 /**
- * Pause menu (Esc / Start): host, join, invite, leave and name (§8, §12).
+ * Pause menu (Esc / Start): boat, host, join, invite, leave and name (§8, §12).
  * Fully usable with a controller: the FocusManager drives it and the code
  * entry cycles characters with up/down.
  */
@@ -56,6 +72,7 @@ export class Menu {
     root: HTMLElement,
     private readonly net: MenuNet,
     private readonly randomName: () => string,
+    private readonly boats: MenuBoats,
   ) {
     this.el.className = 'menu';
     this.el.hidden = true;
@@ -130,11 +147,13 @@ export class Menu {
     const focusedId = (document.activeElement as HTMLElement | null)?.dataset.id;
     const p = this.panel;
     p.replaceChildren();
+    p.classList.toggle('menu-panel-wide', this.screen === 'boat');
     const title = h('h1', { text: 'Waterplay' });
     p.append(title);
 
     if (this.screen === 'main') this.renderMain();
     else if (this.screen === 'join') this.renderJoin();
+    else if (this.screen === 'boat') this.renderBoat();
     else this.renderName();
 
     const hint = h('div', { cls: 'menu-hint' });
@@ -148,7 +167,9 @@ export class Menu {
     const keep = sameScreen && focusedId;
     const prefer = keep
       ? p.querySelector<HTMLElement>(`[data-id="${focusedId}"]`)
-      : p.querySelector<HTMLElement>('[data-focus]');
+      : this.screen === 'boat'
+        ? p.querySelector<HTMLElement>(`[data-id="boat-${this.boats.current()}"]`)
+        : p.querySelector<HTMLElement>('[data-focus]');
     this.focus.refresh(prefer);
   }
 
@@ -160,6 +181,9 @@ export class Menu {
     if (this.flash) p.append(h('div', { cls: 'menu-flash', text: this.flash }));
 
     p.append(button('resume', 'Resume', () => this.close()));
+    p.append(
+      button('boat', `Boat: ${boatTypes[this.boats.current()].name}`, () => this.go('boat')),
+    );
 
     if (s.kind === 'offline') {
       p.append(
@@ -248,6 +272,32 @@ export class Menu {
     );
   }
 
+  private renderBoat(): void {
+    const p = this.panel;
+    p.append(h('div', { cls: 'menu-status', text: 'Pick a boat. You swap where you are.' }));
+    const current = this.boats.current();
+    const layout = h('div', { cls: 'menu-boats' });
+    const list = h('div', { cls: 'menu-boat-list' });
+    const details = h('div', { cls: 'menu-boat-details' });
+    const show = (id: BoatTypeId) => details.replaceChildren(...boatDetails(id));
+    for (const id of BOAT_TYPE_IDS) {
+      const b = button(`boat-${id}`, boatTypes[id].name, () => {
+        this.boats.choose(id);
+        this.close();
+      });
+      if (id === current) b.append(h('span', { cls: 'menu-tag', text: 'current' }));
+      // Hover and D-pad both move focus, so the details follow either.
+      b.addEventListener('focus', () => show(id));
+      list.append(b);
+    }
+    show(current);
+    layout.append(list, details);
+    p.append(
+      layout,
+      button('back', 'Back', () => this.go('main')),
+    );
+  }
+
   private submitJoin(): void {
     const code = normalizeShareCode(this.codeDraft);
     if (!code) {
@@ -311,6 +361,20 @@ function statusLine(s: NetStatus): string {
     case 'reconnecting':
       return 'Lost the host, reconnecting…';
   }
+}
+
+function boatDetails(id: BoatTypeId): HTMLElement[] {
+  const type = boatTypes[id];
+  const bars = statBars(id);
+  const stats = h('dl', { cls: 'menu-stats' });
+  for (const [stat, label] of STAT_LABELS) {
+    const bar = h('dd', { cls: 'menu-bar' });
+    const fill = h('span');
+    fill.style.width = `${Math.round(bars[stat] * 100)}%`;
+    bar.append(fill);
+    stats.append(h('dt', { text: label }), bar);
+  }
+  return [h('h2', { text: type.name }), h('p', { text: type.description }), stats];
 }
 
 function players(list: NetPlayer[]): HTMLElement {

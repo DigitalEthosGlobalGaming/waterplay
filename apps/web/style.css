@@ -322,6 +322,74 @@ body {
   text-transform: uppercase;
 }
 
+.menu-panel.menu-panel-wide {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.menu-boats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+}
+
+.menu-boat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-boat-details {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f0f7fb;
+  font-size: 14px;
+}
+
+.menu-boat-details h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.menu-boat-details p {
+  margin: 0 0 10px;
+  line-height: 1.35;
+}
+
+.menu-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+}
+
+.menu-stats dt {
+  font-weight: 600;
+}
+
+.menu-bar {
+  height: 8px;
+  margin: 0;
+  border-radius: 4px;
+  background: #d4e6f1;
+  overflow: hidden;
+}
+
+.menu-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #1f8fd0;
+  transition: width 0.15s ease-out;
+}
+
+@media (max-width: 520px) {
+  .menu-boats {
+    grid-template-columns: 1fr;
+  }
+}
+
 .menu-hint {
   margin-top: 4px;
   font-size: 12px;

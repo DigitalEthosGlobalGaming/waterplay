@@ -7,6 +7,8 @@ export const models = {
   'boat.rowLarge': 'kenney-watercraft/boat-row-large.glb',
   'boat.fishingSmall': 'kenney-watercraft/boat-fishing-small.glb',
   'boat.speedA': 'kenney-watercraft/boat-speed-a.glb',
+  'boat.speedJ': 'kenney-watercraft/boat-speed-j.glb',
+  'boat.fan': 'kenney-watercraft/boat-fan.glb',
   'boat.sailA': 'kenney-watercraft/boat-sail-a.glb',
   'boat.tugA': 'kenney-watercraft/boat-tug-a.glb',
   'ship.cargoA': 'kenney-watercraft/ship-cargo-a.glb',

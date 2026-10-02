@@ -35,7 +35,7 @@ export interface RenderView {
   boats: RenderBoat[];
   wakes: readonly WakeView[];
   /** The boat the camera chases. */
-  focus: { id: EntityId; heading: number; speed: number } | null;
+  focus: { id: EntityId; heading: number; speed: number; cameraScale: number } | null;
 }
 
 /** How far from the focus the shadow-casting light sits. */
@@ -104,6 +104,7 @@ export class GameRenderer {
       position: this.focusPosition,
       heading: view.focus?.heading ?? 0,
       speed: view.focus?.speed ?? 0,
+      scale: view.focus?.cameraScale ?? 1,
     });
 
     const cam = this.chase.camera.position;
@@ -150,10 +151,17 @@ export class GameRenderer {
     for (const b of boats) {
       seen.add(b.id);
       let group = this.boats.get(b.id);
+      // A player who swaps boats can keep the same key; rebuild the model.
+      if (group && group.userData.boatType !== b.boatType) {
+        group.removeFromParent();
+        this.boats.delete(b.id);
+        group = undefined;
+      }
       if (!group) {
         const g = new Group();
         group = g;
         g.name = b.id;
+        g.userData.boatType = b.boatType;
         this.boats.set(b.id, g);
         this.worldRoot.add(g);
         const type = boatTypes[b.boatType];

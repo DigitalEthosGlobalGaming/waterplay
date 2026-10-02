@@ -146,7 +146,9 @@ export class Boat {
     this.throttle += clamp(target - this.throttle, -maxStep, maxStep);
     const prop = p.localToWorld(b, h.propellerPoint);
     const propellerInWater = water.height(prop.x, prop.z) > prop.y;
-    if (propellerInWater && this.throttle !== 0) {
+    // A fan pushes air, so it works out of the water too.
+    const propellerWorks = propellerInWater || h.propellerInAir;
+    if (propellerWorks && this.throttle !== 0) {
       const boost = this.controls.boost && this.throttle > 0 ? h.boostThrustMultiplier : 1;
       const thrust =
         this.throttle > 0
@@ -159,8 +161,10 @@ export class Boat {
     const steer = clamp(this.controls.steer, -1, 1);
     const forwardSpeed = vLocal.z;
     const speedFactor = sampleCurve(h.rudderSpeedCurve, Math.abs(forwardSpeed));
-    if (propellerInWater && steer !== 0) {
-      const side = steer * h.rudderStrength * speedFactor * Math.sign(forwardSpeed);
+    if (propellerWorks && steer !== 0) {
+      // A water rudder flips with the direction of travel; an air rudder sits in the fan blast.
+      const direction = h.propellerInAir ? 1 : Math.sign(forwardSpeed);
+      const side = steer * h.rudderStrength * speedFactor * direction;
       p.applyForceAtPoint(b, rotate(q, { x: side, y: 0, z: 0 }), prop);
     }
 

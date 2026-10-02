@@ -1,3 +1,4 @@
+import { type BoatTypeId, boatTypes } from '../../data/boats.ts';
 import { platforms } from '../../data/platforms.ts';
 import { simTunables } from '../../data/sim.ts';
 import { wakeParams, waterParams } from '../../data/water.ts';
@@ -5,7 +6,7 @@ import { Boat, type BoatState } from '../boats/boat.ts';
 import { applyRemoteContacts, type RemoteHull } from '../boats/contacts.ts';
 import type { EntityId, Quat, Vec3 } from '../interfaces/common.ts';
 import type { BodyHandle, PhysicsWorld } from '../interfaces/physics.ts';
-import { lerp3, slerp } from '../math/vec.ts';
+import { headingOf, lerp3, quatFromYaw, slerp } from '../math/vec.ts';
 import { createWaterSampler, type WaterSampler, waveConstants } from '../water/gerstner.ts';
 import { WakeField, type WakeSource } from '../water/wakes.ts';
 import { Rng, type RngState } from './rng.ts';
@@ -108,6 +109,25 @@ export class Sim {
     this.previousPoses.delete(id);
   }
 
+  /**
+   * Swap a boat for another type where it floats: same id, position, heading
+   * and way on, but level and with the throttle reset. Returns the new boat.
+   */
+  changeBoatType(id: EntityId, type: BoatTypeId): Boat | undefined {
+    const boat = this.boats.get(id);
+    if (!boat || boat.type === type) return boat;
+    const s = boat.state();
+    return this.addBoat({
+      ...s,
+      boatType: type,
+      rotation: quatFromYaw(headingOf(s.rotation)),
+      linVel: { x: s.linVel.x, y: 0, z: s.linVel.z },
+      angVel: { x: 0, y: 0, z: 0 },
+      throttle: 0,
+      steer: 0,
+    });
+  }
+
   getBoat(id: EntityId): Boat | undefined {
     return this.boats.get(id);
   }
@@ -138,11 +158,19 @@ export class Sim {
     for (const boat of this.boats.values()) {
       const { position } = this.physics.getTransform(boat.body);
       const v = this.physics.getLinearVelocity(boat.body);
-      sources.push({ id: boat.id, x: position.x, z: position.z, vx: v.x, vz: v.z });
+      const scale = boatTypes[boat.type].wakeScale;
+      sources.push({ id: boat.id, x: position.x, z: position.z, vx: v.x, vz: v.z, scale });
     }
     // Other players' boats make waves here too, from their replicated motion.
     for (const r of remotes) {
-      sources.push({ id: r.key, x: r.position.x, z: r.position.z, vx: r.linVel.x, vz: r.linVel.z });
+      sources.push({
+        id: r.key,
+        x: r.position.x,
+        z: r.position.z,
+        vx: r.linVel.x,
+        vz: r.linVel.z,
+        scale: boatTypes[r.boatType].wakeScale,
+      });
     }
     return sources;
   }

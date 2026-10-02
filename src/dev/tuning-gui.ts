@@ -1,6 +1,6 @@
 import GUI, { type Controller } from 'lil-gui';
 import type { Game } from '../app/game.ts';
-import { boatTypes } from '../data/boats.ts';
+import { BOAT_TYPE_IDS, boatTypes } from '../data/boats.ts';
 import { cameraTunables } from '../data/camera.ts';
 import { onTunablesChanged, resetTunableOverrides, setTunableOverride } from '../data/registry.ts';
 import { cloudTunables, skyTunables } from '../data/sky.ts';
@@ -80,8 +80,10 @@ export function installTuningGui(game: Game, session: DevSessionControls): GUI {
   });
 
   const fields: Field[] = [];
-  const handling = boatTypes.speedboat.handling;
-  section(gui, fields, 'Boat: speedboat', 'boats', handling, ['speedboat', 'handling']);
+  for (const id of BOAT_TYPE_IDS) {
+    const type = boatTypes[id];
+    section(gui, fields, `Boat: ${type.name}`, 'boats', type.handling, [id, 'handling']);
+  }
   section(gui, fields, 'Waves', 'water', waterParams, []);
   section(gui, fields, 'Water look', 'waterLook', waterLook, []);
   const wakes = section(gui, fields, 'Wakes', 'wakes', wakeParams, []);

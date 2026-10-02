@@ -11,6 +11,7 @@ import { wrapDelta } from '../core/net/interpolation.ts';
 import { FixedStepAccumulator } from '../core/sim/fixed-step.ts';
 import { EntityIdAllocator } from '../core/sim/ids.ts';
 import { Sim, type SimOptions } from '../core/sim/sim.ts';
+import { type BoatTypeId, boatTypes } from '../data/boats.ts';
 import { applyTunableOverrides, getTunableOverrides } from '../data/registry.ts';
 import { simTunables } from '../data/sim.ts';
 import type { InputSnapshot } from '../input/actions.ts';
@@ -20,6 +21,7 @@ import { Hud } from '../ui/hud.ts';
 import { Menu } from '../ui/menu.ts';
 import { NameTags } from '../ui/name-tags.ts';
 import { NetStatusView } from '../ui/net-status.ts';
+import { loadBoatChoice, saveBoatChoice } from './boat-choice.ts';
 import { Multiplayer } from './multiplayer.ts';
 import { randomPlayerName } from './player-name.ts';
 import type { RestoredSession, SessionState } from './session.ts';
@@ -105,7 +107,10 @@ export class Game {
       opts.createTransport,
     );
     this.multiplayer.session.onNotice((text) => this.netStatus.notice(text));
-    this.menu = new Menu(opts.uiRoot, this.multiplayer, randomPlayerName);
+    this.menu = new Menu(opts.uiRoot, this.multiplayer, randomPlayerName, {
+      current: () => this.sim.getBoat(this.localBoatId)?.type ?? loadBoatChoice(),
+      choose: (type) => this.changeBoat(type),
+    });
     this.localBoatId = this.spawnLocalBoat();
     window.addEventListener('resize', this.onResize);
   }
@@ -194,6 +199,12 @@ export class Game {
     return sim;
   }
 
+  /** Swap the player's boat for another type, where it is (§7.3). Remembered for next time. */
+  changeBoat(type: BoatTypeId): void {
+    saveBoatChoice(type);
+    this.sim.changeBoatType(this.localBoatId, type);
+  }
+
   /** A new id for a boat this instance owns. */
   nextEntityId(): EntityId {
     return this.ids.next();
@@ -205,7 +216,7 @@ export class Game {
     const r = SPAWN_RING.min + Math.random() * (SPAWN_RING.max - SPAWN_RING.min);
     const state = restingBoatState(
       this.ids.next(),
-      'speedboat',
+      loadBoatChoice(),
       Math.cos(angle) * r,
       Math.sin(angle) * r,
       quatFromYaw(Math.random() * Math.PI * 2),
@@ -255,6 +266,7 @@ export class Game {
                 id: local.id,
                 heading: headingOf(localPose.rotation),
                 speed: local.telemetry.speed,
+                cameraScale: boatTypes[local.type].cameraScale,
               }
             : null,
       },

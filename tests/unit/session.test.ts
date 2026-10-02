@@ -19,7 +19,7 @@ function populatedState(): SessionState {
       boats: [
         {
           id: 'dev-A:1',
-          boatType: 'speedboat',
+          boatType: 'tug',
           position: { x: 1200.5, y: -0.42, z: -873.25 },
           rotation: { x: 0.01, y: 0.7, z: -0.02, w: 0.7137 },
           linVel: { x: 3.5, y: 0.1, z: -12 },
